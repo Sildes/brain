@@ -19,6 +19,7 @@
 - [Démarrage rapide (FR)](#démarrage-rapide-fr)
 - [Commandes (FR)](#commandes-fr)
 - [Frameworks pris en charge (FR)](#frameworks-pris-en-charge-fr)
+- [Économie de tokens (FR)](#économie-de-tokens-fr)
 - [Fonctionnement (FR)](#fonctionnement-fr)
 - [Exemple (FR)](#exemple-fr)
 - [Développement (FR)](#développement-fr)
@@ -57,6 +58,20 @@ brain install cursor              # IDE + prompt à coller dans le chat
 - Conventions lues dans la configuration
 - Repères pour retrouver les bons dossiers
 - Un `brain.md` qui centralise le contexte
+
+### Économie de tokens (FR)
+
+Project Brain réduit surtout ce que vous envoyez au modèle **à chaque session**, en évitant de redécouvrir tout le dépôt dans le chat.
+
+| Mécanisme | Effet |
+|-----------|--------|
+| **`brain.md` comme hub** | Contexte **structuré et court** (modules, repères, commandes utiles) à la place d’une exploration « from scratch » et de nombreux fichiers entiers. |
+| **Scan en local** | Arborescence, framework, routes/commandes listées, etc. sont produits **sans** consommation de tokens LLM. |
+| **`brain-prompt.md` limité** | Le générateur ne retient qu’un **petit ensemble de fichiers clés** et borne la taille du prompt d’analyse métier, au lieu de coller le repo au hasard. |
+| **Règle IDE + commandes CLI** | Pour les données à jour (routes, services…), on privilégie une **commande ciblée** et une sortie courte plutôt que d’empiler du code ou du vendor dans le contexte. |
+| **Tableau « Quick Find »** | Moins d’essais/erreurs et de lectures en rafale pour trouver où vit une fonctionnalité. |
+
+**À retenir :** l’économie est **récurrente** (chaque conversation). Il reste un coût ponctuel : `brain scan` après des changements majeurs, et parfois une passe avec `brain-prompt.md` quand le métier évolue — sinon le contexte peut se périmérer.
 
 ### Commandes (FR)
 
@@ -169,6 +184,7 @@ MIT — [LICENSE](LICENSE).
 - [Quick start (EN)](#quick-start-en)
 - [Commands (EN)](#commands-en)
 - [Supported frameworks (EN)](#supported-frameworks-en)
+- [LLM token savings (EN)](#llm-token-savings-en)
 - [How it works (EN)](#how-it-works-en)
 - [Example (EN)](#example-en)
 - [Development (EN)](#development-en)
@@ -207,6 +223,20 @@ brain install cursor              # IDE rule + prompt to paste in chat
 - Conventions from config
 - Pointers for where to look in the codebase
 - One `brain.md` as a single context hub
+
+### LLM token savings (EN)
+
+Project Brain mainly reduces what you send to the model **every session** by avoiding rediscovering the whole repo in chat.
+
+| Mechanism | Effect |
+|-----------|--------|
+| **`brain.md` as a hub** | **Structured, compact** context (modules, pointers, useful commands) instead of “from scratch” exploration and many full files. |
+| **Local scan** | Tree, framework, route/command lists, etc. are produced **without** LLM token usage. |
+| **Bounded `brain-prompt.md`** | The generator keeps only a **small set of key files** and caps the business-analysis prompt size, instead of pasting the repo blindly. |
+| **IDE rule + CLI commands** | For live data (routes, services…), prefer a **targeted command** and short output over stuffing code or vendor files into context. |
+| **“Quick Find” table** | Fewer wrong turns and fewer bulk file reads to locate features. |
+
+**Takeaway:** savings are **ongoing** (each conversation). There is still occasional cost: `brain scan` after major changes, and sometimes a `brain-prompt.md` pass when business logic shifts — otherwise context can go stale.
 
 ### Commands (EN)
 
