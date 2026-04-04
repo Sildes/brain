@@ -1,58 +1,75 @@
 # Project Brain
 
-Generate project context for LLMs - works with any IDE.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Node >= 18](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](package.json)
+
+**Project Brain** génère un contexte projet structuré pour les LLM (fichiers « brain ») à partir de votre code. Il fonctionne avec n’importe quel IDE : vous scannez le dépôt, vous installez une règle légère dans l’IDE, puis le modèle enrichit le contexte métier à partir d’un prompt fourni.
+
+## Sommaire
+
+- [Installation](#installation)
+- [Démarrage rapide](#démarrage-rapide)
+- [Commandes](#commandes)
+- [Frameworks pris en charge](#frameworks-pris-en-charge)
+- [Fonctionnement](#fonctionnement)
+- [Développement](#développement)
+- [Licence](#licence)
 
 ## Installation
+
+Publication npm (`package.json` : `project-brain`) :
 
 ```bash
 npm install -g project-brain
 ```
 
-Or use directly:
+Exécution sans installation globale :
 
 ```bash
 npx project-brain scan
 ```
 
-## Usage
-
-### Quick Start
+## Démarrage rapide
 
 ```bash
-cd your-project
-brain scan                        # Generate brain.md + brain-prompt.md
-brain install cursor              # Configure + show generate prompt
-[Paste prompt in Cursor chat]
-# LLM updates brain.md automatically
+cd votre-projet
+brain scan                        # Génère .project/brain.md + .project/brain-prompt.md
+brain install cursor              # Configure l’IDE et affiche le prompt à coller dans le chat
+# Coller le prompt dans le chat Cursor (ou autre IDE configuré)
+# Le LLM met à jour .project/brain.md (section contexte métier)
 ```
 
-### What You Get
+### Ce que vous obtenez
 
-- **Framework detection** (Symfony, Laravel, Next.js, or generic)
-- **Module extraction** from directory structure
-- **Route extraction** with filtering (business routes only)
-- **Command extraction** from CLI command files
-- **Convention extraction** from config files
-- **Key file identification** for LLM context
-- **Token-efficient** - One read replaces many
+- **Détection de framework** (Symfony, Laravel, Next.js ou générique)
+- **Modules** déduits de l’arborescence
+- **Routes** utiles (filtrage des routes « métier » vs techniques)
+- **Commandes CLI** extraites des fichiers de commandes
+- **Conventions** lues dans les fichiers de configuration
+- **Repères pour retrouver** les bons dossiers rapidement
+- **Contexte factorisé** : une lecture du `brain.md` remplace de nombreuses recherches
 
-## Commands
+## Commandes
 
 ### `brain scan`
 
-Scans project and generates:
-- `.project/brain.md` - Structural map
-- `.project/brain-prompt.md` - LLM prompt
+Analyse le projet courant et génère :
 
-Options:
-```
-brain scan --output .context     # Custom output directory
-brain scan --adapter symfony   # Force specific adapter
+| Fichier | Rôle |
+|---------|------|
+| `.project/brain.md` | Carte structurelle du projet |
+| `.project/brain-prompt.md` | Prompt prêt pour le LLM |
+
+Options :
+
+```bash
+brain scan --output .context       # Répertoire de sortie (défaut : .project)
+brain scan --adapter symfony       # Forcer un adaptateur (symfony, laravel, nextjs, generic)
 ```
 
 ### `brain install [ide]`
 
-Installs brain configuration for your IDE:
+Installe la configuration « brain » pour votre IDE (section marquée, mise à jour sans écraser le reste du fichier quand c’est possible).
 
 ```bash
 brain install cursor      # Cursor (.cursorrules)
@@ -60,75 +77,73 @@ brain install claude      # Claude Code (CLAUDE.md)
 brain install opencode    # Opencode (.opencode/rules.md)
 brain install windsurf    # Windsurf (.windsurfrules)
 brain install zed         # Zed (.zed/rules.md)
-brain install all         # All supported IDEs
-brain install             # Interactive selection
+brain install all         # Tous les IDE supportés
+brain install             # Choix interactif
 ```
 
-**Smart Updates:**
-- Creates file if not exists
-- Appends to existing file (preserves content)
-- Updates only the marked section
+Options :
 
-### Generate Business Context
-
-After `brain install`, copy the displayed prompt to your IDE's chat. The LLM will:
-1. Read `.project/brain-prompt.md`
-2. Generate business context
-3. Write to `.project/brain.md` under `## Business Context`
-
-Done! Your `.project/brain.md` now has complete business context.
-
-## Supported Frameworks
-
-| Framework | Detection | Routes | Commands |
-|-----------|-------------|-------|----------|
-| Symfony | composer.json + bin/console | debug:router | bin/console |
-| Laravel | artisan + composer.json | artisan route:list | artisan |
-| Next.js | package.json (next) | app/ or pages/ directory structure | - |
-| Generic | directory structure | - | - |
-
-## How It Works
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         User's Project                              │
-└─────────────────────────────────────────────────────────────────────┘
-                                │
-                                ▼
-                        ┌───────────────────┐
-                        │   brain scan     │
-                        └───────────────────┘
-                                │
-                ┌───────────────┼───────────────┐
-                │  Detect       │   Extract    │
-                │  Framework   │   Data      │
-                └───────────────┘───────────────┘
-                                │
-                ┌───────────────────────────────────────┐
-                │  .project/brain.md                  │
-                │  .project/brain-prompt.md          │
-                └───────────────────────────────────────┘
-                                │
-                                ▼
-                        ┌───────────────────┐
-                        │   brain install   │
-                        └───────────────────┘
-                                │
-                ┌───────────────┐
-                │  Add rule     │   Show prompt  │
-                │  to IDE       │   for LLM   │
-                └───────────────┘───────────────┘
-                                │
-                                ▼
-                        ┌───────────────────┐
-                        │   Your LLM      │
-                        │   (in IDE)      │
-                        └───────────────────┘
+```bash
+brain install cursor --output .context   # Même répertoire que pour scan
 ```
 
-## Example Output
+### Après l’installation
 
-### .cursorrules (after install)
+Copiez le prompt affiché dans le chat de l’IDE. Le LLM :
+
+1. Lit `.project/brain-prompt.md`
+2. Produit le contexte métier
+3. Écrit dans `.project/brain.md` sous la section **Business Context**
+
+## Frameworks pris en charge
+
+| Framework | Détection | Routes | Commandes |
+|-----------|-----------|--------|-----------|
+| Symfony | `composer.json` + `bin/console` | `debug:router` | `bin/console` |
+| Laravel | `artisan` + `composer.json` | `php artisan route:list` | `artisan` |
+| Next.js | `package.json` (dép. `next`) | structure `app/` ou `pages/` | — |
+| Générique | Arborescence | — | — |
+
+## Fonctionnement
+
+```
+┌─────────────────────────────────────────┐
+│          Projet utilisateur             │
+└─────────────────┬───────────────────────┘
+                  │
+                  ▼
+           ┌──────────────┐
+           │  brain scan  │
+           └──────┬───────┘
+                  │
+     ┌────────────┼────────────┐
+     │ Détection  │  Extraction │
+     │ framework  │  données    │
+     └────────────┴────────────┘
+                  │
+     ┌────────────┴────────────┐
+     │ .project/brain.md       │
+     │ .project/brain-prompt.md │
+     └────────────┬────────────┘
+                  │
+                  ▼
+           ┌──────────────┐
+           │ brain install│
+           └──────┬───────┘
+                  │
+        ┌─────────┴─────────┐
+        │ Règle IDE + prompt │
+        │ pour le LLM        │
+        └─────────┬─────────┘
+                  ▼
+           ┌──────────────┐
+           │  LLM (IDE)   │
+           └──────────────┘
+```
+
+## Exemple (extrait)
+
+### `.cursorrules` (après `brain install`)
 
 ```
 # === BRAIN:START ===
@@ -142,60 +157,25 @@ Quick commands:
 # === BRAIN:END ===
 ```
 
-### .project/brain.md
+### `.project/brain.md`
 
-```markdown
-# 🧠 Project Brain
-> Generated: 2026-04-04T16:00:00Z · Symfony 6.4 · 847 files
+Aperçu typique : modules, routes métier, commandes, conventions, tableau « où chercher quoi », métadonnées (framework, nombre de fichiers, date de génération).
 
-## At a Glance
-- **Modules**: Booking, Billing, Customer, Notification
-- **Routes**: 47 HTTP endpoints
-- **Commands**: 12 CLI commands
+## Développement
 
-## Modules
+Prérequis : **Node.js ≥ 18**.
 
-### Booking
-- **Path**: `src/Booking/`
-- **Depends on**: `billing`, `customer`
-
-## Routes
-
-Total: 412 (397 business, 15 technical)
-
-### Booking
-
-| Route | Method | Path |
-|-------|--------|------|
-| app_booking_new | GET|POST | `/booking/new` |
-| app_booking_show | GET | `/booking/{id}` |
-| app_booking_edit | GET|POST | `/booking/{id}/edit` |
-| ... | ... |
-
-CLI: `php bin/console debug:router` for full list
-
-## Conventions
-- **Standards**: PSR-12
-- Keep controllers thin
-- Business logic in services
-
-## Quick Find
-
-| I need to... | Look in... |
-|-------------|------------|
-| Add an API endpoint | `src/Controller/ + config/routes.yaml` |
-| Add business logic | `src/*/Service/` |
-| Add a CLI command | `src/Command/` |
-
-## Meta
-
-| Property | Value |
-|----------|-------|
-| Framework | Symfony |
-| Files scanned | 847 |
-| Generated | 2026-04-04T16:00:00Z |
+```bash
+git clone https://github.com/Sildes/brain.git
+cd brain
+npm install
+npm run build          # compile vers dist/
+npm run dev -- scan    # exécuter le CLI via tsx sans build global
 ```
 
-## License
+- `npm run build` — compilation TypeScript  
+- `npm run dev` — lance `src/cli.ts` (ex. `npm run dev -- scan`)
 
-MIT
+## Licence
+
+MIT — voir le fichier [LICENSE](LICENSE).
