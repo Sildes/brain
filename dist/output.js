@@ -8,7 +8,7 @@ function estimateTokens(content) {
 function formatDate(date) {
     return date.toISOString().split(".")[0] + "Z";
 }
-export function formatBrainMd(data, dir) {
+export function formatBrainMd(data, dir, businessContext) {
     const lines = [];
     // Header
     lines.push(`# 🧠 Project Brain`);
@@ -121,6 +121,11 @@ export function formatBrainMd(data, dir) {
         lines.push(`| ${mapping.task} | \`${mapping.location}\` |`);
     }
     lines.push("");
+    // Business Context (if provided - preserved from update)
+    if (businessContext) {
+        lines.push(businessContext);
+        lines.push("");
+    }
     // Meta
     lines.push("## Meta");
     lines.push("");

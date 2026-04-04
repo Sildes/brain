@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { program } from "commander";
 import { scanProject } from "./scan.js";
+import { updateProject } from "./update.js";
 import { installIde } from "./install.js";
 import { registerAdapter } from "./adapters/index.js";
 import { symfonyAdapter } from "./adapters/symfony.js";
@@ -36,6 +37,35 @@ program
         console.log(`  Files: ${result.fileCount}`);
         console.log(`\n  Generated: ${result.brainPath}`);
         console.log(`  Prompt: ${result.promptPath}`);
+    }
+    catch (error) {
+        console.error("Error:", error.message);
+        process.exit(1);
+    }
+});
+program
+    .command("update")
+    .description("Update brain files while preserving Business Context")
+    .option("-o, --output <dir>", "Output directory", ".project")
+    .option("-a, --adapter <name>", "Force specific adapter")
+    .action(async (options) => {
+    try {
+        const result = await updateProject({
+            dir: process.cwd(),
+            outputDir: options.output,
+            adapter: options.adapter,
+        });
+        console.log("\n✓ Update complete!");
+        console.log(`  Framework: ${result.framework}`);
+        console.log(`  Modules: ${result.moduleCount}`);
+        console.log(`  Routes: ${result.routeCount}`);
+        console.log(`  Commands: ${result.commandCount}`);
+        console.log(`  Files: ${result.fileCount}`);
+        if (result.contextPreserved) {
+            console.log(`  Business Context: preserved`);
+        }
+        console.log(`\n  Updated: ${result.brainPath}`);
+        console.log(`  Updated: ${result.promptPath}`);
     }
     catch (error) {
         console.error("Error:", error.message);

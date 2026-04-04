@@ -13,7 +13,7 @@ function formatDate(date: Date): string {
   return date.toISOString().split(".")[0] + "Z";
 }
 
-export function formatBrainMd(data: BrainData, dir: string): string {
+export function formatBrainMd(data: BrainData, dir: string, businessContext?: string): string {
   const lines: string[] = [];
 
   // Header
@@ -138,6 +138,12 @@ export function formatBrainMd(data: BrainData, dir: string): string {
     lines.push(`| ${mapping.task} | \`${mapping.location}\` |`);
   }
   lines.push("");
+
+  // Business Context (if provided - preserved from update)
+  if (businessContext) {
+    lines.push(businessContext);
+    lines.push("");
+  }
 
   // Meta
   lines.push("## Meta");
