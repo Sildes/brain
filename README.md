@@ -11,68 +11,6 @@
 
 ---
 
-## Le problème / The Problem
-
-**FR —**
-
-Sans Project Brain, à **chaque session** avec un LLM :
-
-```
-Session 1: "Explore mon projet" → 50 000 tokens (découverte)
-Session 2: "Explore mon projet" → 50 000 tokens (redécouverte)
-Session 3: "Explore mon projet" → 50 000 tokens (redécouverte)
-...
-Total: 150 000+ tokens pour 3 sessions
-```
-
-**EN —**
-
-Without Project Brain, **every session** with an LLM:
-
-```
-Session 1: "Explore my project" → 50,000 tokens (discovery)
-Session 2: "Explore my project" → 50,000 tokens (rediscovery)
-Session 3: "Explore my project" → 50,000 tokens (rediscovery)
-...
-Total: 150,000+ tokens for 3 sessions
-```
-
----
-
-## La solution / The Solution
-
-**FR —**
-
-Avec Project Brain :
-
-```
-Setup:    brain scan → 0 token LLM (tout est local)
-Session 1: lit brain.md → 2 000 tokens (contexte structuré)
-Session 2: lit brain.md → 2 000 tokens (contexte structuré)
-Session 3: lit brain.md → 2 000 tokens (contexte structuré)
-...
-Total: 6 000 tokens pour 3 sessions (96% d'économie)
-```
-
-**EN —**
-
-With Project Brain:
-
-```
-Setup:    brain scan → 0 LLM tokens (all local)
-Session 1: reads brain.md → 2,000 tokens (structured context)
-Session 2: reads brain.md → 2,000 tokens (structured context)
-Session 3: reads brain.md → 2,000 tokens (structured context)
-...
-Total: 6,000 tokens for 3 sessions (96% savings)
-```
-
-> Les chiffres d’exemple (50k / 2k / 96 %) illustrent un ordre de grandeur ; le gain réel dépend de la taille du dépôt et de l’usage.
->
-> *Example figures (50k / 2k / 96%) are illustrative; actual savings depend on repo size and usage.*
-
----
-
 ## Comment ça marche / How It Works
 
 ### Économie de tokens (FR)
@@ -138,16 +76,33 @@ Total: 6,000 tokens for 3 sessions (96% savings)
 
 ### Installation (FR)
 
-Publication npm (`package.json` : `project-brain`) :
+Le paquet **n’est pas publié sur npm** pour l’instant. Installez-le **depuis le dépôt** :
 
 ```bash
-npm install -g project-brain
+git clone https://github.com/Sildes/brain.git
+cd brain
+npm install
+npm run build
 ```
 
-Sans installation globale :
+Utilisation **sans** installation sur le profil (commande `brain` absente du PATH) :
 
 ```bash
-npx project-brain scan
+node dist/cli.js scan
+# ou, pendant le développement
+npm run dev -- scan
+```
+
+**Optionnel — rendre la commande `brain` disponible sur votre profil** (binaire npm global, selon votre préfixe Node, souvent sous le répertoire utilisateur) — après `npm run build`, à la racine du dépôt :
+
+```bash
+npm install -g .
+```
+
+Alternative équivalente pour un lien symbolique vers votre clone (pratique pour développer) :
+
+```bash
+npm link
 ```
 
 ### Démarrage rapide (FR)
@@ -384,16 +339,33 @@ MIT — [LICENSE](LICENSE).
 
 ### Installation (EN)
 
-npm package name: `project-brain`.
+The package is **not published on npm** yet. Install **from the repository**:
 
 ```bash
-npm install -g project-brain
+git clone https://github.com/Sildes/brain.git
+cd brain
+npm install
+npm run build
 ```
 
-Run without a global install:
+Run **without** installing to your user profile (no `brain` on `PATH`):
 
 ```bash
-npx project-brain scan
+node dist/cli.js scan
+# or, while hacking on the tool
+npm run dev -- scan
+```
+
+**Optional — install the `brain` command for your user** (npm global bin, typically under your Node prefix / home directory) — after `npm run build`, from the repo root:
+
+```bash
+npm install -g .
+```
+
+Equivalent symlink workflow while you work on the clone:
+
+```bash
+npm link
 ```
 
 ### Quick start (EN)
