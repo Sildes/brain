@@ -1,0 +1,9 @@
+# === BRAIN:START ===
+Read .project/brain.md first for project context.
+Use navigation commands listed there for live data.
+
+Quick commands:
+- Routes: php bin/console debug:router
+- Services: php bin/console debug:container
+- Tests: php bin/phpunit
+# === BRAIN:END ===

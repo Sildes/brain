@@ -1,0 +1,41 @@
+{
+  "name": "project-brain",
+  "version": "0.1.0",
+  "description": "Generate project context for LLMs - works with any IDE",
+  "type": "module",
+  "bin": {
+    "brain": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.ts",
+    "scan": "tsx src/cli.ts scan",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "llm",
+    "ai",
+    "context",
+    "cursor",
+    "claude",
+    "ide",
+    "project"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^13.1.0",
+    "fast-glob": "^3.3.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
