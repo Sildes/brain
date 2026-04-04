@@ -149,8 +149,10 @@ Project Brain réduit surtout ce que vous envoyez au modèle **à chaque session
 | `.project/brain-prompt.md` | Prompt pour le LLM |
 
 ```bash
-brain scan --output .context       # défaut : .project
-brain scan --adapter symfony       # symfony | laravel | nextjs | generic
+brain scan                        # scan le répertoire courant
+brain scan --dir /path/to/project # scan un autre répertoire
+brain scan --output .context      # défaut : .project
+brain scan --adapter symfony      # symfony | laravel | nextjs | generic
 ```
 
 #### `brain update`
@@ -163,6 +165,34 @@ brain update --output .context    # répertoire personnalisé
 ```
 
 Utilisez `brain update` après des changements de structure (nouveaux modules, routes) pour rafraîchir le contexte sans perdre le travail métier ajouté par le LLM.
+
+#### Brain Topics (FR)
+
+`brain scan` détecte automatiquement des **domaines** (authentication, payments, etc.) par co-occurrence de termes dans les fichiers, routes et commandes.
+
+```
+brain scan
+# Génère :
+#   .project/brain-topics/.draft/*.md       — Brouillons auto-détectés
+#   .project/brain-topics/*.md              — Fichiers enrichis (après LLM)
+#   .project/brain-topics-prompt.md         — Prompt global
+#   .project/brain-topics/[topic]-prompt.md — Prompts individuels
+```
+
+**Workflow :**
+1. `brain scan` — détecte les topics nouveaux/périmés
+2. Copiez le prompt généré vers votre LLM
+3. Collez la réponse dans les fichiers topic
+4. Les futures sessions LLM utilisent les topics comme guides
+
+**Statuts des topics :**
+
+| Statut | Description | Prompt généré ? |
+|--------|-------------|-----------------|
+| NEW | Détecté, jamais enrichi | Oui |
+| UP_TO_DATE | Mêmes fichiers, même contenu | Non |
+| STALE | Fichiers ou contenu modifiés | Oui |
+| ORPHANED | Enrichi mais plus détecté | Avertissement |
 
 #### `brain install [ide]`
 
@@ -243,10 +273,18 @@ votre-projet/
 │   │   ├── Routes            ← Routes métier (filtrées)
 │   │   ├── Navigation (CLI)  ← Commandes utiles
 │   │   ├── Quick Find        ← Tableau "où chercher quoi"
+│   │   ├── Topics            ← Domaines détectés automatiquement
 │   │   ├── Business Context  ← Section remplie par le LLM ✓
 │   │   └── Meta              ← Métadonnées
 │   │
-│   └── brain-prompt.md       ← Fichiers clés + instructions pour le LLM
+│   ├── brain-prompt.md       ← Fichiers clés + instructions pour le LLM
+│   │
+│   ├── brain-topics/         ← Topics (guides par domaine)
+│   │   ├── .draft/           ← Brouillons auto-générés
+│   │   ├── .meta.yaml        ← Suivi des statuts
+│   │   └── *.md              ← Topics enrichis (LLM)
+│   │
+│   └── brain-topics-prompt.md ← Prompt pour enrichir les topics
 │
 ├── .cursorrules              ← Règle IDE (si install cursor)
 │   └── "Read .project/brain.md first..."
@@ -414,6 +452,7 @@ Project Brain mainly reduces what you send to the model **every session** by avo
 ```bash
 brain scan --output .context       # default: .project
 brain scan --adapter symfony       # symfony | laravel | nextjs | generic
+brain scan --dir /path/to/project  # default: current directory
 ```
 
 #### `brain update`
@@ -426,6 +465,34 @@ brain update --output .context    # custom directory
 ```
 
 Use `brain update` after structural changes (new modules, routes) to refresh context without losing the business context added by the LLM.
+
+#### Brain Topics (EN)
+
+`brain scan` automatically detects **domains** (authentication, payments, etc.) via term co-occurrence in files, routes, and commands.
+
+```
+brain scan
+# Generates:
+#   .project/brain-topics/.draft/*.md       — Auto-detected drafts
+#   .project/brain-topics/*.md              — Enriched files (after LLM)
+#   .project/brain-topics-prompt.md         — Global prompt
+#   .project/brain-topics/[topic]-prompt.md — Individual prompts
+```
+
+**Workflow:**
+1. `brain scan` — detects new/stale topics
+2. Copy the generated prompt to your LLM
+3. Paste the response into topic files
+4. Future LLM sessions use topics as navigation guides
+
+**Topic statuses:**
+
+| Status | Description | Prompt Generated? |
+|--------|-------------|-------------------|
+| NEW | Detected, never enriched | Yes |
+| UP_TO_DATE | Same files, same content | No |
+| STALE | Files or content changed | Yes |
+| ORPHANED | Enriched but no longer detected | Warning only |
 
 #### `brain install [ide]`
 
@@ -506,10 +573,18 @@ your-project/
 │   │   ├── Routes            ← Business routes (filtered)
 │   │   ├── Navigation (CLI)  ← Useful commands
 │   │   ├── Quick Find        ← "where to find what" table
+│   │   ├── Topics            ← Auto-detected domains
 │   │   ├── Business Context  ← Section filled by LLM ✓
 │   │   └── Meta              ← Metadata
 │   │
-│   └── brain-prompt.md       ← Key files + instructions for LLM
+│   ├── brain-prompt.md       ← Key files + instructions for LLM
+│   │
+│   ├── brain-topics/         ← Topics (domain guides)
+│   │   ├── .draft/           ← Auto-generated drafts
+│   │   ├── .meta.yaml        ← Status tracking
+│   │   └── *.md              ← Enriched topics (LLM)
+│   │
+│   └── brain-topics-prompt.md ← Prompt for enriching topics
 ├── .cursorrules              ← IDE rule (if you installed cursor)
 │   └── "Read .project/brain.md first..."
 └── src/ ... (your code)

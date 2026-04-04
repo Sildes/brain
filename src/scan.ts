@@ -1,13 +1,31 @@
 import { findBestAdapter } from "./detect.js";
-import { formatBrainMd, formatBrainPromptMd } from "./output.js";
-import { writeFile, mkdir } from "node:fs/promises";
+import { formatBrainMd, formatBrainPromptMd, writeDraftTopics, writeTopicPrompts } from "./output.js";
+import { writeFile, mkdir, readdir } from "node:fs/promises";
 import path from "node:path";
-import type { BrainData } from "./types.js";
+import fg from "fast-glob";
+import type { BrainData, Topic } from "./types.js";
+import { discoverTopics, mergeOverlappingTopics } from "./discover.js";
+import { loadMeta, detectStaleTopics, saveMeta, hashFile } from "./stale.js";
+import { TopicStatus } from "./types.js";
 
 export interface ScanOptions {
   dir: string;
   outputDir?: string;
   adapter?: string;
+}
+
+export interface TopicSummary {
+  name: string;
+  status: string;
+  fileCount: number;
+  routeCount: number;
+  commandCount: number;
+  staleReason?: string;
+  staleDetails?: {
+    added?: string[];
+    removed?: string[];
+    modified?: string[];
+  };
 }
 
 export interface ScanResult {
@@ -19,6 +37,8 @@ export interface ScanResult {
   commandCount: number;
   brainPath: string;
   promptPath: string;
+  topics: TopicSummary[];
+  promptFiles: string[];
 }
 
 async function ensureDir(dir: string): Promise<void> {
@@ -29,10 +49,27 @@ async function ensureDir(dir: string): Promise<void> {
   }
 }
 
+async function getAllFiles(dir: string): Promise<string[]> {
+  try {
+    const { execFile } = await import("node:child_process");
+    const result = await new Promise<string>((resolve, reject) => {
+      execFile("git", ["ls-files", "--cached", "--others", "--exclude-standard"], { cwd: dir, maxBuffer: 10 * 1024 * 1024 }, (err, stdout) => {
+        if (err) reject(err);
+        else resolve(stdout);
+      });
+    });
+    const files = result
+      .split("\n")
+      .filter((f) => f.trim().length > 0);
+    return files;
+  } catch {
+    return [];
+  }
+}
+
 export async function scanProject(options: ScanOptions): Promise<ScanResult> {
   const { dir, outputDir = ".project", adapter: forcedAdapter } = options;
 
-  // Find best adapter
   const result = await findBestAdapter(dir);
 
   if (!result) {
@@ -48,19 +85,59 @@ export async function scanProject(options: ScanOptions): Promise<ScanResult> {
   console.log(`Detected: ${match.framework} (confidence: ${(match.confidence * 100).toFixed(0)}%)`);
   console.log(`Reasons: ${match.reasons.join(", ")}`);
 
-  // Extract project data
   console.log(`Scanning project with ${adapter.name} adapter...`);
   const data: BrainData = await adapter.extract(dir);
 
-  // Generate output
-  const brainMd = formatBrainMd(data, dir);
+  const allFiles = await getAllFiles(dir);
+
+  let topics: Topic[] = [];
+  try {
+    topics = discoverTopics(data, allFiles);
+    topics = mergeOverlappingTopics(topics);
+  } catch (e: any) {
+    console.log("Topic discovery skipped:", e.message);
+  }
+
+  const topicsDir = path.join(dir, outputDir, "brain-topics");
+
+  if (topics.length > 0) {
+    const meta = await loadMeta(topicsDir);
+    topics = await detectStaleTopics(topics, meta, dir);
+
+    await writeDraftTopics(topicsDir, topics);
+
+    const now = new Date().toISOString();
+    const { hashContent } = await import("./stale.js");
+    const metaTopics: Record<string, any> = {};
+    for (const topic of topics) {
+      const fileHashes: Record<string, string> = {};
+      for (const file of topic.files.slice(0, 20)) {
+        try {
+          fileHashes[file] = await hashFile(path.join(dir, file));
+        } catch {
+          continue;
+        }
+      }
+      metaTopics[topic.name] = {
+        draft_generated: now,
+        enriched_at: meta?.topics[topic.name]?.enriched_at || null,
+        enriched_files: meta?.topics[topic.name]?.enriched_files || [],
+        file_hashes: fileHashes,
+        status: topic.status,
+        status_reason: topic.staleReason,
+        status_details: topic.staleDetails,
+      };
+    }
+    await saveMeta(topicsDir, { topics: metaTopics });
+  }
+
+  const brainMd = formatBrainMd(data, dir, undefined, topics);
   const brainPromptMd = await formatBrainPromptMd(data, dir);
 
-  // Ensure output directory exists
   const outputPath = path.join(dir, outputDir);
   await ensureDir(outputPath);
+  await ensureDir(topicsDir);
 
-  // Write files
   const brainPath = path.join(outputPath, "brain.md");
   const promptPath = path.join(outputPath, "brain-prompt.md");
 
@@ -69,6 +146,21 @@ export async function scanProject(options: ScanOptions): Promise<ScanResult> {
 
   console.log(`Generated: ${brainPath}`);
   console.log(`Generated: ${promptPath}`);
+
+  let promptFiles: string[] = [];
+  if (topics.length > 0) {
+    promptFiles = await writeTopicPrompts(outputPath, topicsDir, topics, dir, data);
+  }
+
+  const topicSummaries: TopicSummary[] = topics.map((t) => ({
+    name: t.name,
+    status: t.status,
+    fileCount: t.files.length,
+    routeCount: t.routes.length,
+    commandCount: t.commands.length,
+    staleReason: t.staleReason,
+    staleDetails: t.staleDetails,
+  }));
 
   return {
     framework: data.framework,
@@ -79,5 +171,7 @@ export async function scanProject(options: ScanOptions): Promise<ScanResult> {
     commandCount: data.commands.length,
     brainPath,
     promptPath,
+    topics: topicSummaries,
+    promptFiles,
   };
 }

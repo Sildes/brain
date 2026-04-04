@@ -69,3 +69,48 @@ export interface Adapter {
   detect(dir: string): Promise<AdapterMatch>;
   extract(dir: string): Promise<BrainData>;
 }
+
+export enum TopicStatus {
+  New = 'new',
+  UpToDate = 'up_to_date',
+  Stale = 'stale',
+  Orphaned = 'orphaned',
+}
+
+export enum TopicStaleReason {
+  FilesChanged = 'files_changed',
+  ContentChanged = 'content_changed',
+}
+
+export interface Topic {
+  name: string;
+  keywords: string[];
+  files: string[];
+  routes: Route[];
+  commands: Command[];
+  status: TopicStatus;
+  staleReason?: TopicStaleReason;
+  staleDetails?: {
+    added?: string[];
+    removed?: string[];
+    modified?: string[];
+  };
+}
+
+export interface TopicMeta {
+  draft_generated: string;
+  enriched_at: string | null;
+  enriched_files: string[];
+  file_hashes: Record<string, string>;
+  status: TopicStatus;
+  status_reason?: TopicStaleReason;
+  status_details?: {
+    added?: string[];
+    removed?: string[];
+    modified?: string[];
+  };
+}
+
+export interface TopicMetadata {
+  topics: Record<string, TopicMeta>;
+}

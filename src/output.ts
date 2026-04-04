@@ -1,6 +1,8 @@
-import type { BrainData, Module, Route, Command } from "./types.js";
-import { readFile, stat } from "node:fs/promises";
+import type { BrainData, Module, Route, Command, Topic, TopicMetadata, TopicMeta } from "./types.js";
+import { TopicStatus } from "./types.js";
+import { readFile, stat, writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
+import { hashFile } from "./stale.js";
 
 const MAX_FILES = 10;
 const MAX_TOKENS = 20000;
@@ -13,7 +15,7 @@ function formatDate(date: Date): string {
   return date.toISOString().split(".")[0] + "Z";
 }
 
-export function formatBrainMd(data: BrainData, dir: string, businessContext?: string): string {
+export function formatBrainMd(data: BrainData, dir: string, businessContext?: string, topics?: Topic[]): string {
   const lines: string[] = [];
 
   // Header
@@ -143,6 +145,14 @@ export function formatBrainMd(data: BrainData, dir: string, businessContext?: st
   if (businessContext) {
     lines.push(businessContext);
     lines.push("");
+  }
+
+  // Topics
+  if (topics && topics.length > 0) {
+    const topicsSection = formatTopicsSection(topics);
+    if (topicsSection) {
+      lines.push(topicsSection);
+    }
   }
 
   // Meta
@@ -305,4 +315,373 @@ function inferLanguage(filePath: string): string {
     ".md": "markdown",
   };
   return langMap[ext] || "";
+}
+
+export function formatDraftTopicMd(topic: Topic): string {
+  const lines: string[] = [];
+  lines.push(`# ${topic.name}`);
+  lines.push(`> DRAFT — Auto-generated, may be incomplete`);
+  lines.push("");
+
+  lines.push("## Keywords");
+  lines.push(topic.keywords.map((k) => `\`${k}\``).join(", "));
+  lines.push("");
+
+  lines.push(`## Files (${topic.files.length})`);
+  for (const f of topic.files) {
+    lines.push(`- \`${f}\``);
+  }
+  lines.push("");
+
+  if (topic.routes.length > 0) {
+    lines.push(`## Routes (${topic.routes.length})`);
+    lines.push("| Method | Path | Name |");
+    lines.push("|--------|------|------|");
+    for (const r of topic.routes) {
+      const method = r.methods?.[0] || "GET";
+      lines.push(`| ${method} | ${r.path} | ${r.name} |`);
+    }
+    lines.push("");
+  }
+
+  if (topic.commands.length > 0) {
+    lines.push(`## Commands (${topic.commands.length})`);
+    for (const cmd of topic.commands) {
+      const desc = cmd.description ? ` — ${cmd.description}` : "";
+      lines.push(`- \`${cmd.name}\`${desc}`);
+    }
+    lines.push("");
+  }
+
+  return lines.join("\n");
+}
+
+async function ensureDir(dir: string): Promise<void> {
+  try {
+    await mkdir(dir, { recursive: true });
+  } catch (error: any) {
+    if (error.code !== "EEXIST") throw error;
+  }
+}
+
+export async function writeDraftTopics(topicsDir: string, topics: Topic[]): Promise<void> {
+  const draftDir = path.join(topicsDir, ".draft");
+  await ensureDir(draftDir);
+
+  for (const topic of topics) {
+    const filePath = path.join(draftDir, `${topic.name}.md`);
+    const content = formatDraftTopicMd(topic);
+    await writeFile(filePath, content, "utf8");
+  }
+}
+
+function getFilePriority(p: string): number {
+  if (/Controller/.test(p)) return 10;
+  if (/Service/.test(p)) return 9;
+  if (/(Entity|Model)/.test(p)) return 8;
+  if (/Repository/.test(p)) return 7;
+  if (/config/i.test(p)) return 6;
+  if (/test/i.test(p)) return 3;
+  return 5;
+}
+
+interface KeyFileContent {
+  relativePath: string;
+  content: string;
+}
+
+async function selectKeyFilesForTopic(
+  topic: Topic,
+  projectDir: string,
+  maxTokens: number,
+): Promise<KeyFileContent[]> {
+  const candidates = topic.files
+    .map((f) => ({
+      path: f,
+      priority: getFilePriority(f),
+    }))
+    .sort((a, b) => b.priority - a.priority);
+
+  const selected: KeyFileContent[] = [];
+  let tokens = 0;
+
+  for (const candidate of candidates.slice(0, 10)) {
+    const fullPath = path.join(projectDir, candidate.path);
+    try {
+      const content = await readFile(fullPath, "utf8");
+      const fileTokens = estimateTokens(content);
+      if (tokens + fileTokens > maxTokens) continue;
+      selected.push({ relativePath: candidate.path, content });
+      tokens += fileTokens;
+    } catch {
+      continue;
+    }
+  }
+
+  return selected;
+}
+
+export async function formatTopicPromptMd(
+  topics: Topic[],
+  projectDir: string,
+  data: BrainData,
+): Promise<string> {
+  const lines: string[] = [];
+
+  lines.push("# Paste this into your LLM");
+  lines.push("");
+  lines.push("You are enriching auto-generated \"topic\" files for a codebase.");
+  lines.push("These topics help future LLM sessions quickly find relevant files.");
+  lines.push("");
+
+  lines.push(`## Project: ${data.framework}`);
+  lines.push("");
+  lines.push("| Property | Value |");
+  lines.push("|----------|-------|");
+  lines.push(`| Framework | ${data.framework} |`);
+  lines.push(`| Files | ${data.fileCount} |`);
+  lines.push(`| Routes | ${data.routes.length} |`);
+  lines.push("");
+
+  lines.push("## Instructions");
+  lines.push("");
+  lines.push("For each topic draft below:");
+  lines.push("");
+  lines.push("1. **Validate** — Remove files that aren't actually relevant");
+  lines.push("2. **Complete** — Add missing files (check imports, dependencies)");
+  lines.push("3. **Organize** — Split into \"Core Files\" (essential) and \"Related Files\"");
+  lines.push("4. **Summarize** — Add a brief overview of how this domain works");
+  lines.push("5. **Flow** — Document key flows if applicable (login, payment, etc.)");
+  lines.push("6. **Gotchas** — Note any non-obvious details");
+  lines.push("");
+
+  const staleNew = topics.filter(
+    (t) => t.status === TopicStatus.New || t.status === TopicStatus.Stale,
+  );
+
+  for (let i = 0; i < staleNew.length; i++) {
+    const topic = staleNew[i];
+    lines.push(`## Topic ${i + 1}/${staleNew.length}: ${topic.name}`);
+    lines.push("");
+    lines.push("### Draft");
+    lines.push("| Property | Value |");
+    lines.push("|----------|-------|");
+    lines.push(`| Keywords | ${topic.keywords.join(", ")} |`);
+    lines.push(`| Files | ${topic.files.length} |`);
+    lines.push(`| Routes | ${topic.routes.length} |`);
+    lines.push(`| Commands | ${topic.commands.length} |`);
+    lines.push("");
+
+    if (topic.files.length > 0) {
+      lines.push("**Files detected:**");
+      for (const f of topic.files) {
+        lines.push(`- \`${f}\``);
+      }
+      lines.push("");
+    }
+
+    if (topic.routes.length > 0) {
+      lines.push("**Routes detected:**");
+      lines.push("| Method | Path | Name |");
+      lines.push("|--------|------|------|");
+      for (const r of topic.routes) {
+        lines.push(`| ${r.methods?.[0] || "GET"} | ${r.path} | ${r.name} |`);
+      }
+      lines.push("");
+    }
+
+    const keyFiles = await selectKeyFilesForTopic(topic, projectDir, 5000);
+    if (keyFiles.length > 0) {
+      lines.push("### Key Files Content");
+      lines.push("");
+      for (const kf of keyFiles) {
+        lines.push(`#### ${kf.relativePath}`);
+        lines.push("```" + inferLanguage(kf.relativePath));
+        lines.push(kf.content);
+        lines.push("```");
+        lines.push("");
+      }
+    }
+  }
+
+  lines.push("## Output Format");
+  lines.push("");
+  lines.push("Separate each topic with `---TOPIC---`:");
+  lines.push("");
+  lines.push("---TOPIC---");
+  lines.push(`# [topic-name]`);
+  lines.push("");
+  lines.push("## Overview");
+  lines.push("<Brief description of this domain>");
+  lines.push("");
+  lines.push("## Core Files");
+  lines.push("| File | Role |");
+  lines.push("|------|------|");
+  lines.push("| ... | ... |");
+  lines.push("");
+  lines.push("## Related Files");
+  lines.push("| File | Role |");
+  lines.push("|------|------|");
+  lines.push("| ... | ... |");
+  lines.push("");
+  lines.push("## Flow");
+  lines.push("<key flows if applicable>");
+  lines.push("");
+  lines.push("## Routes");
+  lines.push("| Method | Path | Description |");
+  lines.push("|--------|------|-------------|");
+  lines.push("| ... | ... | ... |");
+  lines.push("");
+  lines.push("## Commands");
+  lines.push("- `command:name` — description");
+  lines.push("");
+  lines.push("## Gotchas");
+  lines.push("<non-obvious details, edge cases>");
+  lines.push("---TOPIC---");
+
+  return lines.join("\n");
+}
+
+export async function formatSingleTopicPromptMd(
+  topic: Topic,
+  projectDir: string,
+  data: BrainData,
+): Promise<string> {
+  const lines: string[] = [];
+
+  lines.push("# Paste this into your LLM");
+  lines.push("");
+  lines.push("You are enriching an auto-generated \"topic\" file for a codebase.");
+  lines.push("This topic helps future LLM sessions quickly find relevant files.");
+  lines.push("");
+
+  lines.push(`## Project: ${data.framework} (${data.fileCount} files)`);
+  lines.push("");
+
+  lines.push("## Instructions");
+  lines.push("");
+  lines.push("1. **Validate** — Remove files that aren't actually relevant");
+  lines.push("2. **Complete** — Add missing files (check imports, dependencies)");
+  lines.push("3. **Organize** — Split into \"Core Files\" and \"Related Files\"");
+  lines.push("4. **Summarize** — Add overview of how this domain works");
+  lines.push("5. **Flow** — Document key flows if applicable");
+  lines.push("6. **Gotchas** — Note non-obvious details");
+  lines.push("");
+
+  lines.push(`## Topic: ${topic.name}`);
+  lines.push("");
+  lines.push("| Property | Value |");
+  lines.push("|----------|-------|");
+  lines.push(`| Keywords | ${topic.keywords.join(", ")} |`);
+  lines.push(`| Files | ${topic.files.length} |`);
+  lines.push(`| Routes | ${topic.routes.length} |`);
+  lines.push(`| Commands | ${topic.commands.length} |`);
+  lines.push("");
+
+  if (topic.files.length > 0) {
+    lines.push("**Files detected:**");
+    for (const f of topic.files) {
+      lines.push(`- \`${f}\``);
+    }
+    lines.push("");
+  }
+
+  const keyFiles = await selectKeyFilesForTopic(topic, projectDir, 5000);
+  if (keyFiles.length > 0) {
+    lines.push("### Key Files Content");
+    lines.push("");
+    for (const kf of keyFiles) {
+      lines.push(`#### ${kf.relativePath}`);
+      lines.push("```" + inferLanguage(kf.relativePath));
+      lines.push(kf.content);
+      lines.push("```");
+      lines.push("");
+    }
+  }
+
+  lines.push("## Output Format");
+  lines.push("");
+  lines.push("---TOPIC---");
+  lines.push(`# ${topic.name}`);
+  lines.push("");
+  lines.push("## Overview");
+  lines.push("<Brief description>");
+  lines.push("");
+  lines.push("## Core Files");
+  lines.push("| File | Role |");
+  lines.push("|------|------|");
+  lines.push("");
+  lines.push("## Related Files");
+  lines.push("| File | Role |");
+  lines.push("|------|------|");
+  lines.push("");
+  lines.push("## Flow");
+  lines.push("<key flows>");
+  lines.push("");
+  lines.push("## Routes");
+  lines.push("| Method | Path | Description |");
+  lines.push("|--------|------|-------------|");
+  lines.push("");
+  lines.push("## Commands");
+  lines.push("- `command:name` — description");
+  lines.push("");
+  lines.push("## Gotchas");
+  lines.push("<non-obvious details>");
+  lines.push("---TOPIC---");
+
+  return lines.join("\n");
+}
+
+export async function writeTopicPrompts(
+  outputDir: string,
+  topicsDir: string,
+  topics: Topic[],
+  projectDir: string,
+  data: BrainData,
+): Promise<string[]> {
+  const staleNew = topics.filter(
+    (t) => t.status === TopicStatus.New || t.status === TopicStatus.Stale,
+  );
+
+  const written: string[] = [];
+
+  if (staleNew.length === 0) return written;
+
+  const globalPrompt = await formatTopicPromptMd(staleNew, projectDir, data);
+  const globalPromptPath = path.join(outputDir, "brain-topics-prompt.md");
+  await writeFile(globalPromptPath, globalPrompt, "utf8");
+  written.push(globalPromptPath);
+
+  await ensureDir(topicsDir);
+  for (const topic of staleNew) {
+    const singlePrompt = await formatSingleTopicPromptMd(topic, projectDir, data);
+    const promptPath = path.join(topicsDir, `${topic.name}-prompt.md`);
+    await writeFile(promptPath, singlePrompt, "utf8");
+    written.push(promptPath);
+  }
+
+  return written;
+}
+
+export function formatTopicsSection(topics: Topic[]): string {
+  if (topics.length === 0) return "";
+
+  const lines: string[] = [];
+  lines.push("## Topics");
+  lines.push("");
+
+  for (const topic of topics) {
+    const statusIcon =
+      topic.status === TopicStatus.UpToDate ? "OK" :
+      topic.status === TopicStatus.New ? "+" :
+      topic.status === TopicStatus.Stale ? "!" :
+      "?";
+    lines.push(`- **${topic.name}** [${statusIcon}] — ${topic.files.length} files, ${topic.routes.length} routes`);
+  }
+
+  lines.push("");
+  lines.push("See `.project/brain-topics/` for topic details.");
+  lines.push("");
+
+  return lines.join("\n");
 }
