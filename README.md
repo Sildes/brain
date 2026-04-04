@@ -3,19 +3,28 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node >= 18](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](package.json)
 
-**Project Brain** génère un contexte projet structuré pour les LLM (fichiers « brain ») à partir de votre code. Il fonctionne avec n’importe quel IDE : vous scannez le dépôt, vous installez une règle légère dans l’IDE, puis le modèle enrichit le contexte métier à partir d’un prompt fourni.
+**FR —** *Project Brain* génère un contexte projet structuré pour les LLM à partir de votre code. Il fonctionne avec n’importe quel IDE : scan du dépôt, règle légère dans l’IDE, puis enrichissement du contexte métier via un prompt.
 
-## Sommaire
+**EN —** *Project Brain* generates structured, LLM-ready project context from your codebase. Use it with any IDE: scan the repo, install a small rule file, then let the model fill in business context from a prompt.
 
-- [Installation](#installation)
-- [Démarrage rapide](#démarrage-rapide)
-- [Commandes](#commandes)
-- [Frameworks pris en charge](#frameworks-pris-en-charge)
-- [Fonctionnement](#fonctionnement)
-- [Développement](#développement)
-- [Licence](#licence)
+**[Français](#français)** · **[English](#english)**
 
-## Installation
+---
+
+## Français
+
+### Sommaire (FR)
+
+- [Installation (FR)](#installation-fr)
+- [Démarrage rapide (FR)](#démarrage-rapide-fr)
+- [Commandes (FR)](#commandes-fr)
+- [Frameworks pris en charge (FR)](#frameworks-pris-en-charge-fr)
+- [Fonctionnement (FR)](#fonctionnement-fr)
+- [Exemple (FR)](#exemple-fr)
+- [Développement (FR)](#développement-fr)
+- [Licence (FR)](#licence-fr)
+
+### Installation (FR)
 
 Publication npm (`package.json` : `project-brain`) :
 
@@ -23,127 +32,102 @@ Publication npm (`package.json` : `project-brain`) :
 npm install -g project-brain
 ```
 
-Exécution sans installation globale :
+Sans installation globale :
 
 ```bash
 npx project-brain scan
 ```
 
-## Démarrage rapide
+### Démarrage rapide (FR)
 
 ```bash
 cd votre-projet
-brain scan                        # Génère .project/brain.md + .project/brain-prompt.md
-brain install cursor              # Configure l’IDE et affiche le prompt à coller dans le chat
-# Coller le prompt dans le chat Cursor (ou autre IDE configuré)
-# Le LLM met à jour .project/brain.md (section contexte métier)
+brain scan                        # .project/brain.md + .project/brain-prompt.md
+brain install cursor              # IDE + prompt à coller dans le chat
+# Coller le prompt dans le chat (Cursor ou autre IDE configuré)
+# Le LLM met à jour .project/brain.md (contexte métier)
 ```
 
-### Ce que vous obtenez
+**Ce que vous obtenez**
 
-- **Détection de framework** (Symfony, Laravel, Next.js ou générique)
-- **Modules** déduits de l’arborescence
-- **Routes** utiles (filtrage des routes « métier » vs techniques)
-- **Commandes CLI** extraites des fichiers de commandes
-- **Conventions** lues dans les fichiers de configuration
-- **Repères pour retrouver** les bons dossiers rapidement
-- **Contexte factorisé** : une lecture du `brain.md` remplace de nombreuses recherches
+- Détection de framework (Symfony, Laravel, Next.js ou générique)
+- Modules déduits de l’arborescence
+- Routes utiles (métier vs techniques)
+- Commandes CLI extraites des fichiers de commandes
+- Conventions lues dans la configuration
+- Repères pour retrouver les bons dossiers
+- Un `brain.md` qui centralise le contexte
 
-## Commandes
+### Commandes (FR)
 
-### `brain scan`
-
-Analyse le projet courant et génère :
+#### `brain scan`
 
 | Fichier | Rôle |
 |---------|------|
-| `.project/brain.md` | Carte structurelle du projet |
-| `.project/brain-prompt.md` | Prompt prêt pour le LLM |
-
-Options :
+| `.project/brain.md` | Carte structurelle |
+| `.project/brain-prompt.md` | Prompt pour le LLM |
 
 ```bash
-brain scan --output .context       # Répertoire de sortie (défaut : .project)
-brain scan --adapter symfony       # Forcer un adaptateur (symfony, laravel, nextjs, generic)
+brain scan --output .context       # défaut : .project
+brain scan --adapter symfony       # symfony | laravel | nextjs | generic
 ```
 
-### `brain install [ide]`
+#### `brain install [ide]`
 
-Installe la configuration « brain » pour votre IDE (section marquée, mise à jour sans écraser le reste du fichier quand c’est possible).
+Installe la configuration brain (section marquée ; le reste du fichier est préservé quand c’est possible).
 
 ```bash
-brain install cursor      # Cursor (.cursorrules)
-brain install claude      # Claude Code (CLAUDE.md)
-brain install opencode    # Opencode (.opencode/rules.md)
-brain install windsurf    # Windsurf (.windsurfrules)
-brain install zed         # Zed (.zed/rules.md)
-brain install all         # Tous les IDE supportés
-brain install             # Choix interactif
+brain install cursor      # .cursorrules
+brain install claude      # CLAUDE.md
+brain install opencode    # .opencode/rules.md
+brain install windsurf    # .windsurfrules
+brain install zed         # .zed/rules.md
+brain install all
+brain install             # interactif
 ```
-
-Options :
 
 ```bash
-brain install cursor --output .context   # Même répertoire que pour scan
+brain install cursor --output .context
 ```
 
-### Après l’installation
+Après installation : coller le prompt dans le chat. Le LLM lit `brain-prompt.md`, produit le contexte métier et l’écrit dans `brain.md` sous **Business Context**.
 
-Copiez le prompt affiché dans le chat de l’IDE. Le LLM :
-
-1. Lit `.project/brain-prompt.md`
-2. Produit le contexte métier
-3. Écrit dans `.project/brain.md` sous la section **Business Context**
-
-## Frameworks pris en charge
+### Frameworks pris en charge (FR)
 
 | Framework | Détection | Routes | Commandes |
 |-----------|-----------|--------|-----------|
 | Symfony | `composer.json` + `bin/console` | `debug:router` | `bin/console` |
 | Laravel | `artisan` + `composer.json` | `php artisan route:list` | `artisan` |
-| Next.js | `package.json` (dép. `next`) | structure `app/` ou `pages/` | — |
+| Next.js | `package.json` (`next`) | `app/` ou `pages/` | — |
 | Générique | Arborescence | — | — |
 
-## Fonctionnement
+### Fonctionnement (FR)
 
 ```
 ┌─────────────────────────────────────────┐
 │          Projet utilisateur             │
 └─────────────────┬───────────────────────┘
-                  │
                   ▼
            ┌──────────────┐
            │  brain scan  │
            └──────┬───────┘
-                  │
-     ┌────────────┼────────────┐
-     │ Détection  │  Extraction │
-     │ framework  │  données    │
-     └────────────┴────────────┘
-                  │
-     ┌────────────┴────────────┐
-     │ .project/brain.md       │
-     │ .project/brain-prompt.md │
-     └────────────┬────────────┘
-                  │
+                  ▼
+     ┌────────────────────────┐
+     │ .project/brain*.md    │
+     └────────────┬──────────┘
                   ▼
            ┌──────────────┐
            │ brain install│
            └──────┬───────┘
-                  │
-        ┌─────────┴─────────┐
-        │ Règle IDE + prompt │
-        │ pour le LLM        │
-        └─────────┬─────────┘
                   ▼
            ┌──────────────┐
            │  LLM (IDE)   │
            └──────────────┘
 ```
 
-## Exemple (extrait)
+### Exemple (FR)
 
-### `.cursorrules` (après `brain install`)
+`.cursorrules` après `brain install` :
 
 ```
 # === BRAIN:START ===
@@ -157,11 +141,9 @@ Quick commands:
 # === BRAIN:END ===
 ```
 
-### `.project/brain.md`
+`.project/brain.md` : modules, routes métier, commandes, conventions, « où chercher quoi », métadonnées.
 
-Aperçu typique : modules, routes métier, commandes, conventions, tableau « où chercher quoi », métadonnées (framework, nombre de fichiers, date de génération).
-
-## Développement
+### Développement (FR)
 
 Prérequis : **Node.js ≥ 18**.
 
@@ -169,13 +151,163 @@ Prérequis : **Node.js ≥ 18**.
 git clone https://github.com/Sildes/brain.git
 cd brain
 npm install
-npm run build          # compile vers dist/
-npm run dev -- scan    # exécuter le CLI via tsx sans build global
+npm run build
+npm run dev -- scan
 ```
 
-- `npm run build` — compilation TypeScript  
-- `npm run dev` — lance `src/cli.ts` (ex. `npm run dev -- scan`)
+### Licence (FR)
 
-## Licence
+MIT — [LICENSE](LICENSE).
 
-MIT — voir le fichier [LICENSE](LICENSE).
+---
+
+## English
+
+### Table of contents (EN)
+
+- [Installation (EN)](#installation-en)
+- [Quick start (EN)](#quick-start-en)
+- [Commands (EN)](#commands-en)
+- [Supported frameworks (EN)](#supported-frameworks-en)
+- [How it works (EN)](#how-it-works-en)
+- [Example (EN)](#example-en)
+- [Development (EN)](#development-en)
+- [License (EN)](#license-en)
+
+### Installation (EN)
+
+npm package name: `project-brain`.
+
+```bash
+npm install -g project-brain
+```
+
+Run without a global install:
+
+```bash
+npx project-brain scan
+```
+
+### Quick start (EN)
+
+```bash
+cd your-project
+brain scan                        # .project/brain.md + .project/brain-prompt.md
+brain install cursor              # IDE rule + prompt to paste in chat
+# Paste the prompt in your IDE chat
+# The LLM updates .project/brain.md (business context)
+```
+
+**What you get**
+
+- Framework detection (Symfony, Laravel, Next.js, or generic)
+- Modules from the directory layout
+- Useful routes (business vs technical noise)
+- CLI commands from command files
+- Conventions from config
+- Pointers for where to look in the codebase
+- One `brain.md` as a single context hub
+
+### Commands (EN)
+
+#### `brain scan`
+
+| File | Role |
+|------|------|
+| `.project/brain.md` | Structural map |
+| `.project/brain-prompt.md` | LLM prompt |
+
+```bash
+brain scan --output .context       # default: .project
+brain scan --adapter symfony       # symfony | laravel | nextjs | generic
+```
+
+#### `brain install [ide]`
+
+Installs Brain snippets (marked section; existing content is preserved when possible).
+
+```bash
+brain install cursor      # .cursorrules
+brain install claude      # CLAUDE.md
+brain install opencode    # .opencode/rules.md
+brain install windsurf    # .windsurfrules
+brain install zed         # .zed/rules.md
+brain install all
+brain install             # interactive
+```
+
+```bash
+brain install cursor --output .context
+```
+
+After install: paste the prompt into chat. The LLM reads `brain-prompt.md`, writes business context into `brain.md` under **Business Context**.
+
+### Supported frameworks (EN)
+
+| Framework | Detection | Routes | Commands |
+|-----------|-----------|--------|----------|
+| Symfony | `composer.json` + `bin/console` | `debug:router` | `bin/console` |
+| Laravel | `artisan` + `composer.json` | `php artisan route:list` | `artisan` |
+| Next.js | `package.json` (`next`) | `app/` or `pages/` | — |
+| Generic | Directory layout | — | — |
+
+### How it works (EN)
+
+```
+┌─────────────────────────────────────────┐
+│            Your project                 │
+└─────────────────┬───────────────────────┘
+                  ▼
+           ┌──────────────┐
+           │  brain scan  │
+           └──────┬───────┘
+                  ▼
+     ┌────────────────────────┐
+     │ .project/brain*.md    │
+     └────────────┬──────────┘
+                  ▼
+           ┌──────────────┐
+           │ brain install│
+           └──────┬───────┘
+                  ▼
+           ┌──────────────┐
+           │  LLM in IDE  │
+           └──────────────┘
+```
+
+### Example (EN)
+
+`.cursorrules` after `brain install`:
+
+```
+# === BRAIN:START ===
+Read .project/brain.md first for project context.
+Use navigation commands listed there for live data.
+
+Quick commands:
+- Routes: php bin/console debug:router
+- Services: php bin/console debug:container
+- Tests: php bin/phpunit
+# === BRAIN:END ===
+```
+
+`.project/brain.md` typically includes modules, business routes, commands, conventions, a “where to look” table, and metadata.
+
+### Development (EN)
+
+Requires **Node.js ≥ 18**.
+
+```bash
+git clone https://github.com/Sildes/brain.git
+cd brain
+npm install
+npm run build
+npm run dev -- scan
+```
+
+- `npm run build` — compile to `dist/`
+- `npm run dev` — run `src/cli.ts` via `tsx`
+
+### License (EN)
+
+MIT — see [LICENSE](LICENSE).
