@@ -549,49 +549,45 @@ export async function formatSingleTopicPromptMd(
 ): Promise<string> {
   const lines: string[] = [];
 
-  lines.push("# Paste this into your LLM");
-  lines.push("");
-  lines.push("You are enriching an auto-generated \"topic\" file for a codebase.");
-  lines.push("This topic helps future LLM sessions quickly find relevant files.");
+  lines.push(`You are enriching an auto-generated topic file for a ${data.framework} codebase.`);
+  lines.push(`Topic: **${topic.name}** — help future LLM sessions find relevant files quickly.`);
   lines.push("");
 
-  lines.push(`## Project: ${data.framework} (${data.fileCount} files)`);
-  lines.push("");
-
-  lines.push("## Instructions");
-  lines.push("");
-  lines.push("1. **Validate** — Remove files that aren't actually relevant");
-  lines.push("2. **Complete** — Add missing files (check imports, dependencies)");
-  lines.push("3. **Organize** — Split into \"Core Files\" and \"Related Files\"");
-  lines.push("4. **Summarize** — Add overview of how this domain works");
-  lines.push("5. **Flow** — Document key flows if applicable");
-  lines.push("6. **Gotchas** — Note non-obvious details");
-  lines.push("");
-
-  lines.push(`## Topic: ${topic.name}`);
-  lines.push("");
-  lines.push("| Property | Value |");
-  lines.push("|----------|-------|");
-  lines.push(`| Keywords | ${topic.keywords.join(", ")} |`);
-  lines.push(`| Files | ${topic.files.length} |`);
-  lines.push(`| Routes | ${topic.routes.length} |`);
-  lines.push(`| Commands | ${topic.commands.length} |`);
+  lines.push("## Context");
+  lines.push(`- Keywords: ${topic.keywords.join(", ")}`);
+  lines.push(`- Files detected: ${topic.files.length}`);
+  lines.push(`- Routes: ${topic.routes.length} | Commands: ${topic.commands.length}`);
   lines.push("");
 
   if (topic.files.length > 0) {
-    lines.push("**Files detected:**");
-    for (const f of topic.files) {
+    lines.push("## Files detected");
+    for (const f of topic.files.slice(0, 50)) {
       lines.push(`- \`${f}\``);
+    }
+    if (topic.files.length > 50) {
+      lines.push(`- ... and ${topic.files.length - 50} more`);
+    }
+    lines.push("");
+  }
+
+  if (topic.routes.length > 0) {
+    lines.push("## Routes detected");
+    for (const r of topic.routes.slice(0, 30)) {
+      const method = r.methods?.[0] || "GET";
+      lines.push(`- ${method} ${r.path} (${r.name})`);
+    }
+    if (topic.routes.length > 30) {
+      lines.push(`- ... and ${topic.routes.length - 30} more`);
     }
     lines.push("");
   }
 
   const keyFiles = await selectKeyFilesForTopic(topic, projectDir, 5000);
   if (keyFiles.length > 0) {
-    lines.push("### Key Files Content");
+    lines.push("## Key Files Content");
     lines.push("");
     for (const kf of keyFiles) {
-      lines.push(`#### ${kf.relativePath}`);
+      lines.push(`### ${kf.relativePath}`);
       lines.push("```" + inferLanguage(kf.relativePath));
       lines.push(kf.content);
       lines.push("```");
@@ -599,9 +595,23 @@ export async function formatSingleTopicPromptMd(
     }
   }
 
+  lines.push("## Instructions");
+  lines.push("");
+  lines.push("1. **Validate** - remove files that aren't relevant to this topic");
+  lines.push("2. **Complete** - add missing files (check imports, dependencies)");
+  lines.push("3. **Organize** - split into Core Files (essential) and Related Files");
+  lines.push("4. **Summarize** - add a brief overview of how this domain works");
+  lines.push("5. **Flow** - document key flows if applicable (login, payment, etc.)");
+  lines.push("6. **Gotchas** - note non-obvious details, edge cases");
+  lines.push("");
+  lines.push("Rules:");
+  lines.push("- keywords > sentences, bullets > paragraphs");
+  lines.push("- code references: `ClassName::method` or `file.ext`");
+  lines.push("- be concise, token-efficient");
+  lines.push("");
   lines.push("## Output Format");
   lines.push("");
-  lines.push("---TOPIC---");
+  lines.push("```md");
   lines.push(`# ${topic.name}`);
   lines.push("");
   lines.push("## Overview");
@@ -622,12 +632,11 @@ export async function formatSingleTopicPromptMd(
   lines.push("| Method | Path | Description |");
   lines.push("|--------|------|-------------|");
   lines.push("");
-  lines.push("## Commands");
-  lines.push("- `command:name` — description");
-  lines.push("");
   lines.push("## Gotchas");
-  lines.push("<non-obvious details>");
-  lines.push("---TOPIC---");
+  lines.push("- <non-obvious details>");
+  lines.push("```");
+
+  lines.push("");
 
   return lines.join("\n");
 }

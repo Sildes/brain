@@ -58,6 +58,31 @@ npm link
 
 **Prerequis :** Node.js >= 18
 
+## Demarrage rapide
+
+```bash
+cd votre-projet
+
+# 1. Scanner le projet
+brain scan
+# -> .project/brain.md + .project/brain-prompt.md + topics detectes
+
+# 2. Generer le prompt pour le contexte metier
+brain prompt
+# -> .project/brain-prompt.md (pret a copier dans le chat LLM)
+
+# 3. Coller le prompt dans votre LLM
+# -> Le LLM genere le Business Context
+# -> Copier la reponse dans .project/brain.md (section "## Business Context")
+
+# 4. (Optionnel) Enrichir les topics detectes
+brain prompt --topic all            # tous les topics d'un coup
+brain prompt --topic admin          # ou un par un
+
+# 5. (Optionnel) Installer la config IDE
+brain install cursor
+```
+
 ## Commandes
 
 ### `brain scan`
@@ -97,6 +122,37 @@ Re-scanne le projet en preservant la section Business Context.
 brain update
 brain update --dir /path/to/project
 brain update --output .context
+```
+
+### `brain prompt`
+
+Genere le prompt LLM pour le contexte metier ou un topic specifique.
+
+```bash
+brain prompt                        # prompt global (Business Context)
+brain prompt --dir /path/to/project # sur un autre projet
+brain prompt --topic admin          # prompt pour un topic specifique
+brain prompt --topic all            # prompts pour TOUS les topics d'un coup
+brain prompt --topic all --stdout   # afficher sans sauvegarder
+```
+
+**Exemple de sortie :**
+
+```
+✓ Business context prompt generated
+  Saved to: .project/brain-prompt.md
+
+  Paste this prompt into your LLM chat to generate Business Context.
+
+  Topics with pending prompts:
+    - admin (1421 files, 394 routes)
+    - affiliation (5 files, 0 routes)
+    - invoice (4 files, 0 routes)
+
+  Generate topic prompts with:
+    brain prompt --topic admin
+    brain prompt --topic affiliation
+    brain prompt --topic invoice
 ```
 
 ### `brain install [ide]`
@@ -180,11 +236,11 @@ CODE SOURCE                    BRAIN                        LLM
 | src/     |  brain scan    | brain.md |  lit           |          |
 | config/  | -------------> |          | ------------> | IDE      |
 | tests/   |                |          |               |          |
-+----------+  brain update  | prompt.md| <------------ |          |
-               (preserve     |          |  ecrit         |          |
-                Business     | topics/  |  Business      +----------+
-                Context)     |          |  Context
-                             +----------+
++----------+  brain prompt  | prompt.md| <------------ |          |
+               brain update  | topics/  |  ecrit         |          |
+                (preserve     |          |  Business      +----------+
+                 Business     |          |  Context
+                 Context)     +----------+
 ```
 
 ### Flux complet

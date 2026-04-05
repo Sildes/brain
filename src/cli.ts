@@ -8,6 +8,11 @@ import { symfonyAdapter } from "./adapters/symfony.js";
 import { laravelAdapter } from "./adapters/laravel.js";
 import { nextjsAdapter } from "./adapters/nextjs.js";
 import { genericAdapter } from "./adapters/generic.js";
+import { findBestAdapter } from "./detect.js";
+import { discoverTopics, mergeOverlappingTopics } from "./discover.js";
+import { TopicStatus } from "./types.js";
+import { execFile } from "node:child_process";
+import path from "node:path";
 
 // Register all adapters
 registerAdapter(symfonyAdapter);
@@ -146,4 +151,124 @@ program
     }
   });
 
+program
+  .command("prompt")
+  .description("Generate LLM prompt for business context or specific topic")
+  .option("-d, --dir <path>", "Project directory", process.cwd())
+  .option("-o, --output <dir>", "Output directory", ".project")
+  .option("-t, --topic <name>", "Generate prompt for a specific topic")
+  .option("-a, --adapter <name>", "Force specific adapter")
+  .option("--stdout", "Print prompt to stdout instead of saving")
+  .action(async (options) => {
+    try {
+      const dir = options.dir;
+      const outputDir = options.output;
+      const result = await findBestAdapter(dir);
+
+      if (!result) {
+        throw new Error("No suitable adapter found. Run 'brain scan' first.");
+      }
+
+      const { adapter } = result;
+      const data = await adapter.extract(dir);
+
+      if (options.topic) {
+        const topics = await getTopics(dir, data);
+        const staleNew = topics.filter(
+          (t) => t.status === TopicStatus.New || t.status === TopicStatus.Stale,
+        );
+
+        let selected: typeof topics;
+        if (options.topic.toLowerCase() === "all") {
+          selected = staleNew;
+          if (selected.length === 0) {
+            console.log("All topics are up to date. No prompts to generate.");
+            return;
+          }
+        } else {
+          const topic = topics.find((t) => t.name === options.topic);
+          if (!topic) {
+            console.error(`Topic "${options.topic}" not found.`);
+            console.error(`Available topics: ${topics.map((t) => t.name).join(", ")}`);
+            process.exit(1);
+          }
+          selected = [topic];
+        }
+
+        const { writeFile, mkdir } = await import("node:fs/promises");
+        const topicsDir = path.join(dir, outputDir, "brain-topics");
+        await mkdir(topicsDir, { recursive: true });
+
+        for (const topic of selected) {
+          const prompt = await formatSingleTopicPromptMd(topic, dir, data);
+          if (options.stdout) {
+            console.log(prompt);
+            console.log("\n---TOPIC-SEPARATOR---\n");
+          } else {
+            const promptPath = path.join(topicsDir, `${topic.name}-prompt.md`);
+            await writeFile(promptPath, prompt, "utf8");
+            console.log(`  ✓ ${topic.name} -> ${promptPath}`);
+          }
+        }
+
+        if (!options.stdout) {
+          console.log(`\n✓ ${selected.length} topic prompt(s) generated`);
+          console.log("  Paste each prompt into your LLM chat to enrich the topics.");
+        }
+      } else {
+        const prompt = await formatBrainPromptMd(data, dir);
+        if (options.stdout) {
+          console.log(prompt);
+        } else {
+          const promptPath = path.join(dir, outputDir, "brain-prompt.md");
+          const { writeFile, mkdir } = await import("node:fs/promises");
+          await mkdir(path.join(dir, outputDir), { recursive: true });
+          await writeFile(promptPath, prompt, "utf8");
+          console.log(`\n✓ Business context prompt generated`);
+          console.log(`  Saved to: ${promptPath}`);
+          console.log(`\n  Paste this prompt into your LLM chat to generate Business Context.`);
+          console.log(`  The LLM will produce a section to add to ${path.join(dir, outputDir, "brain.md")}`);
+
+          const topics = await getTopics(dir, data);
+          const staleNew = topics.filter((t) => t.status === TopicStatus.New || t.status === TopicStatus.Stale);
+          if (staleNew.length > 0) {
+            console.log(`\n  Topics with pending prompts:`);
+            for (const t of staleNew) {
+              console.log(`    - ${t.name} (${t.files.length} files, ${t.routes.length} routes)`);
+            }
+            console.log(`\n  Generate topic prompts with:`);
+            for (const t of staleNew) {
+              console.log(`    brain prompt --topic ${t.name}`);
+            }
+          }
+        }
+      }
+    } catch (error: any) {
+      console.error("Error:", error.message);
+      process.exit(1);
+    }
+  });
+
 program.parse();
+
+async function getTopics(dir: string, data: any) {
+  const allFiles = await new Promise<string[]>((resolve) => {
+    execFile("git", ["ls-files", "--cached", "--others", "--exclude-standard"], { cwd: dir, maxBuffer: 10 * 1024 * 1024 }, (err, stdout) => {
+      if (err) { resolve([]); return; }
+      resolve(stdout.split("\n").filter((f) => f.trim().length > 0));
+    });
+  });
+  let topics = discoverTopics(data, allFiles);
+  topics = mergeOverlappingTopics(topics);
+  return topics;
+}
+
+async function formatBrainPromptMd(data: any, dir: string): Promise<string> {
+  const { formatBrainPromptMd: fn } = await import("./output.js");
+  return fn(data, dir);
+}
+
+async function formatSingleTopicPromptMd(topic: any, dir: string, data: any): Promise<string> {
+  const { formatSingleTopicPromptMd: fn } = await import("./output.js");
+  return fn(topic, dir, data);
+}
