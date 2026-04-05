@@ -1,7 +1,7 @@
 # Project Brain
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Node >= 18](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](package.json)
+[License: MIT](LICENSE)
+[Node >= 18](package.json)
 
 ## Objectif
 
@@ -26,9 +26,7 @@ Session 1    Session 2              Setup        Session 1    Session N
 Ces deux actions sont **au coeur du projet** : sans elles, les topics restent des brouillons et vous ne recupérez pas le gain de contexte ciblé sur chaque domaine fonctionnel.
 
 Après chaque `brain scan` (ou lorsque le rapport affiche des topics `new` / `stale`) :
-
-1. **Copier** le contenu de `.project/brain-topics-prompt.md` vers votre LLM (ou les prompts individuels dans `brain-topics/`), puis faire enrichir chaque topic.
-2. **Sauvegarder** chaque réponse dans `.project/brain-topics/[nom].md` (un fichier par topic enrichi).
+**Sauvegarder** chaque réponse dans `.project/brain-topics/[nom].md` (un fichier par topic enrichi).
 
 Le CLI rappelle ces étapes à la fin du scan ; détail du workflow : section [Brain Topics](#brain-topics).
 
@@ -98,21 +96,25 @@ brain scan --adapter symfony      # forcer un adapter
 
 **Fichiers generes :**
 
-| Fichier | Role |
-|---------|------|
-| `.project/brain.md` | Carte structurelle du projet |
-| `.project/brain-prompt.md` | Prompt pour enrichissement LLM |
+
+| Fichier                         | Role                              |
+| ------------------------------- | --------------------------------- |
+| `.project/brain.md`             | Carte structurelle du projet      |
+| `.project/brain-prompt.md`      | Prompt pour enrichissement LLM    |
 | `.project/brain-topics/.draft/` | Topics auto-detectes (brouillons) |
-| `.project/brain-topics-prompt.md` | Prompt global pour enrichir les topics |
+|                                 |                                   |
+
 
 **Frameworks supportes :**
 
-| Framework | Detection | Routes | Commandes |
-|-----------|-----------|--------|-----------|
-| Symfony | `composer.json` + `bin/console` | `debug:router` | `bin/console` |
-| Laravel | `artisan` + `composer.json` | `route:list` | `artisan` |
-| Next.js | `package.json` (`next`) | `app/` ou `pages/` | -- |
-| Generique | Arborescence | -- | -- |
+
+| Framework | Detection                       | Routes             | Commandes     |
+| --------- | ------------------------------- | ------------------ | ------------- |
+| Symfony   | `composer.json` + `bin/console` | `debug:router`     | `bin/console` |
+| Laravel   | `artisan` + `composer.json`     | `route:list`       | `artisan`     |
+| Next.js   | `package.json` (`next`)         | `app/` ou `pages/` | --            |
+| Generique | Arborescence                    | --                 | --            |
+
 
 ### `brain update`
 
@@ -145,15 +147,29 @@ brain prompt --topic all --stdout   # afficher sans sauvegarder
   Paste this prompt into your LLM chat to generate Business Context.
 
   Topics with pending prompts:
-    - admin (1421 files, 394 routes)
-    - affiliation (5 files, 0 routes)
-    - invoice (4 files, 0 routes)
+    - admin (48 files, 103 routes)
+    - booking (21 files, 12 routes)
+    - stripe (16 files, 2 routes)
 
   Generate topic prompts with:
     brain prompt --topic admin
-    brain prompt --topic affiliation
-    brain prompt --topic invoice
+    brain prompt --topic booking
+    brain prompt --topic stripe
 ```
+
+### `brain enrich`
+
+Genere une instruction unique pour que le LLM traite **tous les topics d'un coup**.
+
+```bash
+brain enrich                          # genere .project/brain-enrich.md
+brain enrich --dir /path/to/project   # sur un autre projet
+brain enrich --topic booking          # un seul topic
+brain enrich --stdout                 # afficher sans sauvegarder
+brain enrich --install cursor         # installe comme regle IDE
+```
+
+**Fonctionnement :** genere un fichier `brain-enrich.md` qui liste chaque prompt de topic avec son chemin de sortie. Collez ce fichier dans votre LLM — il lira chaque prompt et ecrira les fichiers enrichis automatiquement.
 
 ### `brain install [ide]`
 
@@ -190,12 +206,14 @@ brain install             # interactif
 
 ### Statuts des topics
 
-| Statut | Description | Prompt genere ? |
-|--------|-------------|-----------------|
-| `new` | Detecte, jamais enrichi | Oui |
-| `up_to_date` | Meme fichiers, meme contenu | Non |
-| `stale` | Fichiers ou contenu modifies | Oui |
-| `orphaned` | Enrichi mais plus detecte | Non |
+
+| Statut       | Description                  | Prompt genere ? |
+| ------------ | ---------------------------- | --------------- |
+| `new`        | Detecte, jamais enrichi      | Oui             |
+| `up_to_date` | Meme fichiers, meme contenu  | Non             |
+| `stale`      | Fichiers ou contenu modifies | Oui             |
+| `orphaned`   | Enrichi mais plus detecte    | Non             |
+
 
 ### Exemple de sortie
 
@@ -208,12 +226,12 @@ brain install             # interactif
   Files: 362
 
   Topics:
-     + admin                new          1421 files, 394 routes
-     + ckeditor             new            11 files, 0 routes
-     + chart                new            23 files, 1 routes
-     + invoice              new             4 files, 0 routes
-     + privacy              new             1 files, 6 routes
-     + affiliation          new             5 files, 0 routes
+     + booking              new          21 files, 12 routes
+     + stripe               new          16 files, 2 routes
+     + admin                new          48 files, 103 routes
+     + security             new          17 files, 0 routes
+     + matching             new          12 files, 6 routes
+     + instagram            new          11 files, 20 routes
 
   Prompts generated:
     - .project/brain-topics-prompt.md
@@ -297,7 +315,8 @@ votre-projet/
 |   |   +-- Meta                  Metadonnees
 |   |
 |   +-- brain-prompt.md           Fichiers cles + instructions LLM
-|   +-- brain-topics-prompt.md    Prompt pour enrichir les topics
+|  
+|   +-- brain-enrich.md           Instruction d'enrichissement de tous les topics
 |   +-- brain-topics/
 |       +-- .draft/               Brouillons auto-generes
 |       +-- .meta.yaml            Suivi des statuts
@@ -309,23 +328,27 @@ votre-projet/
 
 ### Economie de tokens
 
-| Mecanisme | Effet |
-|-----------|-------|
-| **brain.md comme hub** | Contexte structure et compact au lieu d'une exploration from scratch |
-| **Scan en local** | Arborescence, framework, routes/commandes produits sans tokens LLM |
-| **brain-prompt.md borne** | Petit ensemble de fichiers cles, taille limitee |
-| **Quick Find** | Moins d'essais/erreurs pour trouver ou vit une fonctionnalite |
-| **Topics** | Domaines pre-identifies, prompts cibles par sujet |
+
+| Mecanisme                 | Effet                                                                |
+| ------------------------- | -------------------------------------------------------------------- |
+| **brain.md comme hub**    | Contexte structure et compact au lieu d'une exploration from scratch |
+| **Scan en local**         | Arborescence, framework, routes/commandes produits sans tokens LLM   |
+| **brain-prompt.md borne** | Petit ensemble de fichiers cles, taille limitee                      |
+| **Quick Find**            | Moins d'essais/erreurs pour trouver ou vit une fonctionnalite        |
+| **Topics**                | Domaines pre-identifies, prompts cibles par sujet                    |
+
 
 ## Outils complementaires
 
 Project Brain structure le **contexte projet** (fichiers `.project/`). Vous pouvez le combiner avec d'autres outils orientes **sortie shell** ou **empaquetage de code** pour limiter encore la taille du contexte :
 
-| Outil | Description | Depot / site |
-|-------|-------------|--------------|
+
+| Outil                       | Description                                                                                                                                                                                                                                      | Depot / site                                                                                  |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
 | **RTK** (Rust Token Killer) | Proxy CLI qui filtre, groupe et tronque les sorties des commandes courantes (`git`, tests, `docker`, `grep`, etc.) avant qu'elles n'entrent dans le contexte du LLM ; prise en charge de nombreux outils d'IA (Cursor, Claude Code, Copilot, …). | [github.com/rtk-ai/rtk](https://github.com/rtk-ai/rtk) · [rtk-ai.app](https://www.rtk-ai.app) |
-| **Repomix** | Empaquete un depot en un fichier (ou une archive) texte avec arborescence et regles d'inclusion / exclusion, pratique pour un prompt ponctuel « tout le repo ». | [github.com/yamadashy/repomix](https://github.com/yamadashy/repomix) |
-| **Gitingest** | Transforme une URL de depot Git en extrait texte (fichiers + tree) utilisable comme contexte pour un LLM. | [gitingest.com](https://gitingest.com) |
+| **Repomix**                 | Empaquete un depot en un fichier (ou une archive) texte avec arborescence et regles d'inclusion / exclusion, pratique pour un prompt ponctuel « tout le repo ».                                                                                  | [github.com/yamadashy/repomix](https://github.com/yamadashy/repomix)                          |
+| **Gitingest**               | Transforme une URL de depot Git en extrait texte (fichiers + tree) utilisable comme contexte pour un LLM.                                                                                                                                        | [gitingest.com](https://gitingest.com)                                                        |
+
 
 **Astuce :** Brain pour la carte vivante du projet ; RTK pour ce qui transite par le terminal ; Repomix ou Gitingest quand vous avez besoin d'un dump complet ponctuel.
 

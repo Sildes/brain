@@ -428,116 +428,99 @@ export async function formatTopicPromptMd(
 ): Promise<string> {
   const lines: string[] = [];
 
-  lines.push("# Paste this into your LLM");
+  lines.push("# Brain Topic Enrichment");
   lines.push("");
-  lines.push("You are enriching auto-generated \"topic\" files for a codebase.");
-  lines.push("These topics help future LLM sessions quickly find relevant files.");
+  lines.push(`Framework: ${data.framework} · ${data.fileCount} files · ${data.routes.length} routes`);
   lines.push("");
-
-  lines.push(`## Project: ${data.framework}`);
-  lines.push("");
-  lines.push("| Property | Value |");
-  lines.push("|----------|-------|");
-  lines.push(`| Framework | ${data.framework} |`);
-  lines.push(`| Files | ${data.fileCount} |`);
-  lines.push(`| Routes | ${data.routes.length} |`);
-  lines.push("");
-
-  lines.push("## Instructions");
-  lines.push("");
-  lines.push("For each topic draft below:");
-  lines.push("");
-  lines.push("1. **Validate** — Remove files that aren't actually relevant");
-  lines.push("2. **Complete** — Add missing files (check imports, dependencies)");
-  lines.push("3. **Organize** — Split into \"Core Files\" (essential) and \"Related Files\"");
-  lines.push("4. **Summarize** — Add a brief overview of how this domain works");
-  lines.push("5. **Flow** — Document key flows if applicable (login, payment, etc.)");
-  lines.push("6. **Gotchas** — Note any non-obvious details");
+  lines.push("GOAL: enrich each topic draft below into a compact LLM-optimized file.");
+  lines.push("CRITICAL: YAML-like format. No prose. No markdown tables. `ClassName::method` > descriptions. Max 200 lines/topic.");
   lines.push("");
 
   const staleNew = topics.filter(
     (t) => t.status === TopicStatus.New || t.status === TopicStatus.Stale,
   );
 
+  lines.push("## Steps");
+  lines.push("");
+  lines.push("For each topic below:");
+  lines.push("1. READ the listed files to understand the domain");
+  lines.push("2. VALIDATE — remove irrelevant files, add missing ones (check imports, deps)");
+  lines.push("3. WRITE enriched file to `.project/brain-topics/[name].md` using the format below");
+  lines.push("");
+
+  lines.push(`## Topics (${staleNew.length})`);
+  lines.push("");
+
   for (let i = 0; i < staleNew.length; i++) {
     const topic = staleNew[i];
-    lines.push(`## Topic ${i + 1}/${staleNew.length}: ${topic.name}`);
+    lines.push(`### ${i + 1}/${staleNew.length}: ${topic.name}`);
+    lines.push(`keywords: ${topic.keywords.join(", ")}`);
+    lines.push(`output: .project/brain-topics/${topic.name}.md`);
     lines.push("");
-    lines.push("### Draft");
-    lines.push("| Property | Value |");
-    lines.push("|----------|-------|");
-    lines.push(`| Keywords | ${topic.keywords.join(", ")} |`);
-    lines.push(`| Files | ${topic.files.length} |`);
-    lines.push(`| Routes | ${topic.routes.length} |`);
-    lines.push(`| Commands | ${topic.commands.length} |`);
-    lines.push("");
-
-    if (topic.files.length > 0) {
-      lines.push("**Files detected:**");
-      for (const f of topic.files) {
-        lines.push(`- \`${f}\``);
-      }
-      lines.push("");
-    }
 
     if (topic.routes.length > 0) {
-      lines.push("**Routes detected:**");
-      lines.push("| Method | Path | Name |");
-      lines.push("|--------|------|------|");
+      lines.push("routes:");
       for (const r of topic.routes) {
-        lines.push(`| ${r.methods?.[0] || "GET"} | ${r.path} | ${r.name} |`);
+        lines.push(`  ${r.methods?.[0] || "GET"} ${r.path}: ${r.name}`);
       }
       lines.push("");
     }
 
-    const keyFiles = await selectKeyFilesForTopic(topic, projectDir, 5000);
-    if (keyFiles.length > 0) {
-      lines.push("### Key Files Content");
+    if (topic.commands.length > 0) {
+      lines.push("commands:");
+      for (const cmd of topic.commands) {
+        const desc = cmd.description ? ` — ${cmd.description}` : "";
+        lines.push(`  ${cmd.name}${desc}`);
+      }
       lines.push("");
-      for (const kf of keyFiles) {
-        lines.push(`#### ${kf.relativePath}`);
-        lines.push("```" + inferLanguage(kf.relativePath));
-        lines.push(kf.content);
-        lines.push("```");
-        lines.push("");
+    }
+
+    lines.push("read these files:");
+    const keyFiles = await selectKeyFilesForTopic(topic, projectDir, 5000);
+    for (const kf of keyFiles) {
+      lines.push(`  ${kf.relativePath}`);
+    }
+    for (const f of topic.files) {
+      if (!keyFiles.some((kf) => kf.relativePath === f)) {
+        lines.push(`  ${f}`);
       }
     }
+    lines.push("");
   }
 
   lines.push("## Output Format");
   lines.push("");
-  lines.push("Separate each topic with `---TOPIC---`:");
+  lines.push("```");
+  lines.push("# [topic-name]");
+  lines.push("domain: <1-5 words>");
+  lines.push("purpose: <1 line max 15 words>");
   lines.push("");
-  lines.push("---TOPIC---");
-  lines.push(`# [topic-name]`);
+  lines.push("## core");
+  lines.push("path/File.php: ClassName — role");
   lines.push("");
-  lines.push("## Overview");
-  lines.push("<Brief description of this domain>");
+  lines.push("## related");
+  lines.push("path/X.php: XName — role");
   lines.push("");
-  lines.push("## Core Files");
-  lines.push("| File | Role |");
-  lines.push("|------|------|");
-  lines.push("| ... | ... |");
+  lines.push("## flows");
+  lines.push("name: A::b → C::d → E::f");
   lines.push("");
-  lines.push("## Related Files");
-  lines.push("| File | Role |");
-  lines.push("|------|------|");
-  lines.push("| ... | ... |");
+  lines.push("## routes");
+  lines.push("GET /path: route_name");
   lines.push("");
-  lines.push("## Flow");
-  lines.push("<key flows if applicable>");
+  lines.push("## commands");
+  lines.push("command:name — 3 word desc");
   lines.push("");
-  lines.push("## Routes");
-  lines.push("| Method | Path | Description |");
-  lines.push("|--------|------|-------------|");
-  lines.push("| ... | ... | ... |");
+  lines.push("## gotchas");
+  lines.push("- X does Y instead of Z — path/file.php");
+  lines.push("```");
   lines.push("");
-  lines.push("## Commands");
-  lines.push("- `command:name` — description");
+
+  lines.push("## Cleanup");
   lines.push("");
-  lines.push("## Gotchas");
-  lines.push("<non-obvious details, edge cases>");
-  lines.push("---TOPIC---");
+  lines.push("After writing all enriched topic files:");
+  lines.push("1. DELETE `.project/brain-topics/*-prompt.md` files — they are single-use prompts, not needed after enrichment");
+  lines.push("2. DELETE `.project/brain-topics/.draft/` directory — drafts are replaced by enriched files");
+  lines.push("3. DELETE any enriched topic file that is empty, redundant, or too vague to be useful — bad topics pollute context more than no topics");
 
   return lines.join("\n");
 }
@@ -561,11 +544,11 @@ export async function formatSingleTopicPromptMd(
 
   if (topic.files.length > 0) {
     lines.push("## Files detected");
-    for (const f of topic.files.slice(0, 50)) {
+    for (const f of topic.files.slice(0, 80)) {
       lines.push(`- \`${f}\``);
     }
-    if (topic.files.length > 50) {
-      lines.push(`- ... and ${topic.files.length - 50} more`);
+    if (topic.files.length > 80) {
+      lines.push(`- ... and ${topic.files.length - 80} more`);
     }
     lines.push("");
   }
@@ -574,7 +557,7 @@ export async function formatSingleTopicPromptMd(
     lines.push("## Routes detected");
     for (const r of topic.routes.slice(0, 30)) {
       const method = r.methods?.[0] || "GET";
-      lines.push(`- ${method} ${r.path} (${r.name})`);
+      lines.push(`- ${method} ${r.path}: ${r.name}`);
     }
     if (topic.routes.length > 30) {
       lines.push(`- ... and ${topic.routes.length - 30} more`);
@@ -584,59 +567,54 @@ export async function formatSingleTopicPromptMd(
 
   const keyFiles = await selectKeyFilesForTopic(topic, projectDir, 5000);
   if (keyFiles.length > 0) {
-    lines.push("## Key Files Content");
+    lines.push("## Read these files first");
     lines.push("");
     for (const kf of keyFiles) {
-      lines.push(`### ${kf.relativePath}`);
-      lines.push("```" + inferLanguage(kf.relativePath));
-      lines.push(kf.content);
-      lines.push("```");
-      lines.push("");
+      lines.push(`- ${kf.relativePath}`);
     }
+    lines.push("");
   }
 
-  lines.push("## Instructions");
+  lines.push("## Task");
   lines.push("");
-  lines.push("1. **Validate** - remove files that aren't relevant to this topic");
-  lines.push("2. **Complete** - add missing files (check imports, dependencies)");
-  lines.push("3. **Organize** - split into Core Files (essential) and Related Files");
-  lines.push("4. **Summarize** - add a brief overview of how this domain works");
-  lines.push("5. **Flow** - document key flows if applicable (login, payment, etc.)");
-  lines.push("6. **Gotchas** - note non-obvious details, edge cases");
+  lines.push("Produce a TOPIC FILE optimized for LLM consumption (not human readable).");
+  lines.push("Goal: minimize tokens while maximizing information density for future LLM sessions.");
   lines.push("");
-  lines.push("Rules:");
-  lines.push("- keywords > sentences, bullets > paragraphs");
-  lines.push("- code references: `ClassName::method` or `file.ext`");
-  lines.push("- be concise, token-efficient");
+  lines.push("## Rules (CRITICAL)");
+  lines.push("- YAML-like compact format — NO markdown tables, NO prose paragraphs");
+  lines.push("- Every line must be useful to an LLM. No filler. No summaries. No explanations.");
+  lines.push("- `ClassName::method` references > descriptions");
+  lines.push("- One file per line with its role as tags, not sentences");
+  lines.push("- Flows = ordered list of `Class::method → Class::method` chains");
+  lines.push("- Gotchas = single-line bullets with file reference");
+  lines.push("- MAX 200 lines total. Cut before padding.");
   lines.push("");
   lines.push("## Output Format");
   lines.push("");
-  lines.push("```md");
-  lines.push(`# ${topic.name}`);
-  lines.push("");
-  lines.push("## Overview");
-  lines.push("<Brief description>");
-  lines.push("");
-  lines.push("## Core Files");
-  lines.push("| File | Role |");
-  lines.push("|------|------|");
-  lines.push("");
-  lines.push("## Related Files");
-  lines.push("| File | Role |");
-  lines.push("|------|------|");
-  lines.push("");
-  lines.push("## Flow");
-  lines.push("<key flows>");
-  lines.push("");
-  lines.push("## Routes");
-  lines.push("| Method | Path | Description |");
-  lines.push("|--------|------|-------------|");
-  lines.push("");
-  lines.push("## Gotchas");
-  lines.push("- <non-obvious details>");
   lines.push("```");
-
+  lines.push(`# ${topic.name}`);
+  lines.push("domain: <1-5 word domain label>");
+  lines.push("purpose: <1 line, max 15 words>");
   lines.push("");
+  lines.push("## core");
+  lines.push("path/to/File.php: ClassName — <3 word role>");
+  lines.push("path/to/Other.php: OtherName — <3 word role>");
+  lines.push("");
+  lines.push("## related");
+  lines.push("path/X.php: XName — role");
+  lines.push("");
+  lines.push("## flows");
+  lines.push("flow-name: Controller::action → Service::method → Repository::method");
+  lines.push("other-flow: A::b → C::d");
+  lines.push("");
+  lines.push("## routes");
+  lines.push("GET /path: route_name");
+  lines.push("POST /path: route_name");
+  lines.push("");
+  lines.push("## gotchas");
+  lines.push("- ClassName::method does X instead of Y — path/to/file.php");
+  lines.push("- edge case: Z fails when W — path/to/file.php");
+  lines.push("```");
 
   return lines.join("\n");
 }

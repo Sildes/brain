@@ -14,13 +14,52 @@ const GENERIC_TERMS = new Set([
   'error', 'exception', 'log', 'debug', 'info', 'warn', 'notice', 'critical', 'alert',
   'bin', 'env', 'prod', 'dev', 'local', 'cache', 'tmp', 'temp', 'build', 'dist',
   'composer', 'npm', 'yarn', 'node', 'vendor', 'node_modules',
-  'css', 'js', 'ts', 'php', 'html', 'sql', 'yaml', 'yml', 'json', 'xml', 'md',
+  'css', 'js', 'ts', 'php', 'html', 'sql', 'yaml', 'yml', 'md',
   'symfony', 'laravel', 'doctrine', 'twig', 'monolog', 'maker',
   'ee', 'et', 'cs', 'se', 'si', 'me', 'te', 'ce', 'de', 'le', 'la', 'les',
   'fr', 'en', 'es', 'de', 'it', 'pt', 'ru', 'ja', 'zh', 'ko', 'ar',
   'up', 'down', 'on', 'off', 'in', 'out', 'to', 'from', 'with', 'without',
-  'core', 'common', 'general', 'misc', 'other', 'extra', 'default',
+  'core', 'common', 'general', 'misc', 'other', 'extra',
   'install', 'uninstall', 'setup', 'init', 'run', 'start', 'stop', 'restart',
+
+  'style', 'doc', 'docs', 'quick', 'validate', 'simple', 'hidden', 'confirm', 'read',
+  'generate', 'preview', 'configuration', 'guide', 'clear', 'frame', 'inline', 'link',
+  'unit', 'initial', 'featured', 'fixture', 'example', 'complete', 'smart', 'filter',
+  'batch', 'export', 'secure', 'send', 'verify', 'change', 'upload', 'search', 'count',
+  'action', 'match', 'route', 'page', 'web', 'part', 'content', 'setting', 'icon',
+  'layer', 'marker', 'subscriber', 'event', 'listener', 'bug', 'correction', 'topic',
+  'prompt', 'brain', 'readme', 'functional', 'summary', 'rule', 'project', 'command',
+  'notification', 'card', 'conversation', 'score', 'archive', 'template', 'term',
+  'magic', 'form', 'token', 'email', 'reset', 'password', 'check', 'dashboard',
+  'linking', 'connexion', 'impersonate', 'broadcast', 'package', 'secure',
+  'success', 'thread', 'accordion', 'animated', 'expandable', 'field', 'item',
+  'connection', 'connect', 'hide', 'profil', 'extension', 'extension', 'as', 'ft',
+  'no', 'not', 'story', 'storie', 'fixture', 'script', 'deployment', 'plan',
+  'generator', 'post', 'landing', 'promo', 'newsletter', 'phone', 'chat',
+  'modal', 'calendar', 'tailwind', 'gif', 'editor', 'review',
+  'sonata', 'crud', 'fixture', 'subscriber', 'subscriber',
+
+  'id', 'uid', 'guid', 'uuid', 'fk', 'pk',
+  'tab', 'table', 'row', 'column', 'grid', 'cell', 'header', 'footer', 'nav',
+  'btn', 'button', 'input', 'select', 'checkbox', 'radio', 'toggle', 'dropdown',
+  'label', 'placeholder', 'tooltip', 'badge', 'alert', 'toast', 'popup', 'overlay',
+  'sidebar', 'navbar', 'toolbar', 'menu', 'breadcrumb', 'pagination',
+  'wrapper', 'container', 'layout', 'section', 'block', 'slot', 'panel', 'widget',
+  'red', 'blue', 'green', 'white', 'black', 'gray', 'dark', 'light',
+  'sm', 'md', 'lg', 'xl', 'xs', 'xxl',
+  'left', 'right', 'top', 'bottom', 'center', 'middle',
+  'width', 'height', 'size', 'margin', 'padding', 'border', 'radius',
+  'desktop', 'mobile', 'tablet', 'responsive',
+  'frontend', 'backend', 'server', 'client', 'proxy', 'middleware',
+  'database', 'migration', 'schema', 'seed', 'collection', 'association',
+  'encode', 'decode', 'parse', 'serialize', 'transform', 'convert', 'format',
+  'enabled', 'disabled', 'active', 'inactive', 'visible', 'invisible',
+  'status', 'state', 'flag', 'option', 'param', 'argument', 'attribute',
+  'callback', 'hook', 'event', 'signal', 'dispatch', 'emit',
+  'apply', 'execute', 'process', 'handle', 'resolve', 'reject', 'fulfill',
+  'copy', 'paste', 'drag', 'drop', 'scroll', 'zoom', 'click', 'hover', 'focus', 'blur',
+  'async', 'await', 'promise', 'observable', 'stream', 'buffer',
+  'version', 'release', 'changelog', 'commit', 'branch', 'merge', 'tag',
 ]);
 
 const EXPANSIONS: Record<string, string> = {
@@ -34,6 +73,10 @@ const EXPANSIONS: Record<string, string> = {
   'rpt': 'reporting',
 };
 
+const MAX_CLUSTER_SIZE = 15;
+const MAX_TOPIC_COVERAGE = 0.25;
+const MAX_KEYWORD_COVERAGE = 0.35;
+
 interface TermInfo {
   term: string;
   source: string;
@@ -46,24 +89,36 @@ function splitTerms(input: string): string[] {
   if (typeof input !== 'string') return [];
   return input
     .replace(/([a-z])([A-Z])/g, '$1 $2')
-    .replace(/[_\-./\\]/g, ' ')
+    .replace(/[_\-./\\::{}()\[\]]/g, ' ')
     .split(/\s+/)
     .filter((t) => t.length > 1);
 }
 
 function normalizeTerm(term: string): string {
   let t = term.toLowerCase();
-  if (t.endsWith('s') && t.length > 2) {
-    t = t.slice(0, -1);
-  }
   if (t.endsWith('ies') && t.length > 4) {
     t = t.slice(0, -3) + 'y';
+  } else if (/(?:sh|ch|ss|x|z)es$/.test(t)) {
+    t = t.slice(0, -2);
+  } else if (/(?:ss|us|is)$/.test(t)) {
+    // already singular — don't strip
+  } else if (t.endsWith('s') && t.length > 2) {
+    t = t.slice(0, -1);
   }
   return t;
 }
 
+function isNoiseTerm(term: string): boolean {
+  if (/^\d+$/.test(term)) return true;
+  if (/^\d+x\d+$/.test(term)) return true;
+  if (/^\d+x$/.test(term)) return true;
+  if (/^user\d+$/.test(term)) return true;
+  if (term.length <= 2) return true;
+  return false;
+}
+
 function isBlacklisted(term: string): boolean {
-  return GENERIC_TERMS.has(term);
+  return GENERIC_TERMS.has(term) || isNoiseTerm(term);
 }
 
 function extractTermsFromPath(filePath: string): string[] {
@@ -128,6 +183,7 @@ function filterTerms(
     if (info.files.size < minOccurrences) continue;
     const coverage = info.files.size / totalFileCount;
     if (coverage > maxCoverage) continue;
+    if (isNoiseTerm(term)) continue;
     filtered.set(term, info);
   }
   return filtered;
@@ -197,6 +253,57 @@ function findConnectedComponents(
   return components;
 }
 
+function splitOversizedClusters(
+  clusters: string[][],
+  matrix: Map<string, Map<string, number>>,
+  maxSize: number,
+): string[][] {
+  const result: string[][] = [];
+  for (const cluster of clusters) {
+    if (cluster.length <= maxSize) {
+      result.push(cluster);
+      continue;
+    }
+
+    const clusterSet = new Set(cluster);
+    const subMatrix = new Map<string, Map<string, number>>();
+    for (const term of cluster) {
+      const neighbors = matrix.get(term);
+      if (!neighbors) continue;
+      const subNeighbors = new Map<string, number>();
+      for (const [neighbor, count] of neighbors) {
+        if (clusterSet.has(neighbor)) {
+          subNeighbors.set(neighbor, count);
+        }
+      }
+      subMatrix.set(term, subNeighbors);
+    }
+
+    const sortedEdges: Array<{ a: string; b: string; count: number }> = [];
+    for (const term of cluster) {
+      const neighbors = subMatrix.get(term);
+      if (!neighbors) continue;
+      for (const [neighbor, count] of neighbors) {
+        if (term < neighbor) {
+          sortedEdges.push({ a: term, b: neighbor, count });
+        }
+      }
+    }
+    sortedEdges.sort((a, b) => b.count - a.count);
+    const medianIdx = Math.floor(sortedEdges.length / 2);
+    const medianCount = sortedEdges.length > 0 ? sortedEdges[medianIdx].count : 1;
+    const higherThreshold = medianCount + 1;
+
+    const subClusters = findConnectedComponents(subMatrix, Math.max(higherThreshold, 2));
+    for (const sub of subClusters) {
+      if (sub.length > 0) {
+        result.push(sub);
+      }
+    }
+  }
+  return result;
+}
+
 function nameCluster(cluster: string[], termScores: Map<string, TermInfo>): string {
   let bestTerm = cluster[0];
   let bestScore = 0;
@@ -219,8 +326,9 @@ function assignFilesToTopics(
     const fileTerms = extractTermsFromPath(file);
     const termSet = new Set(fileTerms);
     for (const topic of topics) {
-      const hasMatch = topic.keywords.some((k) => termSet.has(k));
-      if (hasMatch) {
+      const matchCount = topic.keywords.filter((k) => termSet.has(k)).length;
+      const minMatches = topic.keywords.length <= 5 ? 1 : topic.keywords.length <= 10 ? 2 : 3;
+      if (matchCount >= minMatches) {
         topic.files.push(file);
       }
     }
@@ -238,8 +346,9 @@ function assignRoutesToTopics(
     ];
     const termSet = new Set(routeTerms);
     for (const topic of topics) {
-      const hasMatch = topic.keywords.some((k) => termSet.has(k));
-      if (hasMatch) {
+      const matchCount = topic.keywords.filter((k) => termSet.has(k)).length;
+      const minMatches = topic.keywords.length <= 5 ? 1 : topic.keywords.length <= 10 ? 2 : 3;
+      if (matchCount >= minMatches) {
         topic.routes.push(route);
       }
     }
@@ -254,12 +363,17 @@ function assignCommandsToTopics(
     const cmdTerms = extractTermsFromName(command.name);
     const termSet = new Set(cmdTerms);
     for (const topic of topics) {
-      const hasMatch = topic.keywords.some((k) => termSet.has(k));
-      if (hasMatch) {
+      const matchCount = topic.keywords.filter((k) => termSet.has(k)).length;
+      const minMatches = topic.keywords.length <= 5 ? 1 : topic.keywords.length <= 10 ? 2 : 3;
+      if (matchCount >= minMatches) {
         topic.commands.push(command);
       }
     }
   }
+}
+
+function computeCooccurrenceThreshold(totalFiles: number): number {
+  return Math.max(3, Math.ceil(Math.sqrt(totalFiles) * 0.25));
 }
 
 export function discoverTopics(data: BrainData, allFiles: string[]): Topic[] {
@@ -300,7 +414,8 @@ export function discoverTopics(data: BrainData, allFiles: string[]): Topic[] {
     addTerms(fileTerms, 'file', 1.0, file, occurrences);
   }
 
-  const significantTerms = filterTerms(occurrences, allFiles, 5, 0.4);
+  const minOccurrences = Math.max(3, Math.ceil(allFiles.length * 0.005));
+  const significantTerms = filterTerms(occurrences, allFiles, minOccurrences, MAX_KEYWORD_COVERAGE);
 
   if (significantTerms.size === 0) {
     return [{
@@ -314,8 +429,10 @@ export function discoverTopics(data: BrainData, allFiles: string[]): Topic[] {
   }
 
   const cooccurrence = buildCooccurrenceMatrix(significantTerms, allFiles);
+  const baseThreshold = computeCooccurrenceThreshold(allFiles.length);
 
-  const clusters = findConnectedComponents(cooccurrence, 2);
+  let clusters = findConnectedComponents(cooccurrence, baseThreshold);
+  clusters = splitOversizedClusters(clusters, cooccurrence, MAX_CLUSTER_SIZE);
 
   const standaloneTerms: string[] = [];
   const significantKeys = new Set(significantTerms.keys());
@@ -344,7 +461,13 @@ export function discoverTopics(data: BrainData, allFiles: string[]): Topic[] {
   assignRoutesToTopics(data.routes, topics);
   assignCommandsToTopics(data.commands, topics);
 
-  const finalTopics = topics.filter((t) => t.files.length > 0);
+  const totalFiles = allFiles.length || 1;
+  let finalTopics = topics.filter((t) => t.files.length > 0);
+
+  finalTopics = finalTopics.filter((t) => {
+    const coverage = t.files.length / totalFiles;
+    return coverage <= MAX_TOPIC_COVERAGE;
+  });
 
   if (finalTopics.length === 0 && allFiles.length > 0) {
     return [{

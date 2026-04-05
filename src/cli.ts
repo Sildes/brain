@@ -3,6 +3,7 @@ import { program } from "commander";
 import { scanProject } from "./scan.js";
 import { updateProject } from "./update.js";
 import { installIde } from "./install.js";
+import { enrichTopics } from "./enrich.js";
 import { registerAdapter } from "./adapters/index.js";
 import { symfonyAdapter } from "./adapters/symfony.js";
 import { laravelAdapter } from "./adapters/laravel.js";
@@ -144,6 +145,29 @@ program
         ide: ide,
         brainPath: `${options.output}/brain.md`,
         promptPath: `${options.output}/brain-prompt.md`,
+      });
+    } catch (error: any) {
+      console.error("Error:", error.message);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("enrich")
+  .description("Generate enrichment instruction for processing all topic prompts")
+  .option("-d, --dir <path>", "Project directory", process.cwd())
+  .option("-o, --output <dir>", "Output directory", ".project")
+  .option("-t, --topic <name>", "Generate instruction for a specific topic (or 'all')")
+  .option("-i, --install <ide>", "Install instruction as IDE rule (cursor, claude, opencode, windsurf, zed)")
+  .option("--stdout", "Print instruction to stdout")
+  .action(async (options) => {
+    try {
+      await enrichTopics({
+        dir: options.dir,
+        outputDir: options.output,
+        topic: options.topic,
+        ide: options.install,
+        stdout: options.stdout,
       });
     } catch (error: any) {
       console.error("Error:", error.message);

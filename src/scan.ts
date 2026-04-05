@@ -90,9 +90,16 @@ export async function scanProject(options: ScanOptions): Promise<ScanResult> {
 
   const allFiles = await getAllFiles(dir);
 
+  const topicFiles = allFiles.filter((f) => {
+    if (/^\.|\/\./.test(f)) return false;
+    if (/\.(avif|webp|png|jpg|jpeg|gif|svg|ico|woff2?|ttf|eot|mp[34]|pdf|zip|gz|tar|mp4|mov)$/i.test(f)) return false;
+    if (f.startsWith('vendor/') || f.startsWith('node_modules/')) return false;
+    return true;
+  });
+
   let topics: Topic[] = [];
   try {
-    topics = discoverTopics(data, allFiles);
+    topics = discoverTopics(data, topicFiles);
     topics = mergeOverlappingTopics(topics);
   } catch (e: any) {
     console.log("Topic discovery skipped:", e.message);
