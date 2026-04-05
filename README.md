@@ -3,80 +3,36 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node >= 18](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](package.json)
 
-## 🎯 Objectif / Goal
+## Objectif
 
-**FR —** Réduire drastiquement les tokens consommés par les LLMs en structurant le contexte projet **une seule fois**, puis en le réutilisant à **chaque session**.
-
-**EN —** Drastically reduce LLM token usage by structuring project context **once**, then reusing it **every session**.
-
----
-
-## Comment ça marche / How It Works
-
-### Économie de tokens (FR)
+Reduire drastiquement les tokens consommes par les LLMs en structurant le contexte projet **une seule fois**, puis en le reutilisant a **chaque session**.
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                     SANS PROJECT BRAIN (coût répété)                         │
-│                                                                              │
-│  Session 1          Session 2          Session 3          Session N         │
-│  ┌─────────┐        ┌─────────┐        ┌─────────┐        ┌─────────┐       │
-│  │ 50k     │        │ 50k     │        │ 50k     │        │ 50k     │       │
-│  │ tokens  │        │ tokens  │        │ tokens  │        │ tokens  │       │
-│  └─────────┘        └─────────┘        └─────────┘        └─────────┘       │
-│                                                                              │
-│  → Exploration depuis zéro à chaque session                                  │
-│  → Fichiers entiers envoyés au LLM                                          │
-│  → Pas de mémoire entre sessions                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
+SANS BRAIN                          AVEC BRAIN
 
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                     AVEC PROJECT BRAIN (coût unique)                         │
-│                                                                              │
-│  Setup (local)      Session 1          Session 2          Session N         │
-│  ┌─────────┐        ┌─────────┐        ┌─────────┐        ┌─────────┐       │
-│  │  0      │        │  2k     │        │  2k     │        │  2k     │       │
-│  │ tokens  │        │ tokens  │        │ tokens  │        │ tokens  │       │
-│  │ (local) │        │         │        │         │        │         │       │
-│  └─────────┘        └─────────┘        └─────────┘        └─────────┘       │
-│       │                   ▲                  ▲                  ▲             │
-│       │                   │                  │                  │             │
-│   brain scan          lit brain.md       lit brain.md       lit brain.md     │
-│   brain update        (réutilisation)    (réutilisation)    (réutilisation)  │
-│                                                                              │
-│  → Même carte projet ; données fraîches via commandes ciblées (routes, etc.)  │
-└─────────────────────────────────────────────────────────────────────────────┘
+Session 1    Session 2              Setup        Session 1    Session N
++--------+   +--------+            +--------+   +--------+   +--------+
+| 50k    |   | 50k    |            | 0      |   | 2k     |   | 2k     |
+| tokens |   | tokens |            | tokens |   | tokens |   | tokens |
++--------+   +--------+            +--------+   +--------+   +--------+
+                                   brain scan   lit brain.md lit brain.md
+                                   (local)
 ```
 
-**EN —** The same diagram applies: without Brain, each session pays a large “full discovery” cost; with Brain, **local** `brain scan` / `brain update` refreshes structure, and each session reuses compact **`brain.md`** instead of re-reading the whole tree.
+**Project Brain** genere un contexte structure pour les LLMs a partir de votre code. Il detecte le framework, extrait les modules, routes, commandes, et produit des fichiers `brain.md` et `brain-prompt.md` que votre IDE charge automatiquement.
 
----
+## Etapes indispensables (Topics)
 
-**FR —** *Project Brain* génère un contexte projet structuré pour les LLMs à partir de votre code. Il fonctionne avec n’importe quel IDE : scan du dépôt, règle légère dans l’IDE, puis enrichissement du contexte métier via un prompt.
+Ces deux actions sont **au coeur du projet** : sans elles, les topics restent des brouillons et vous ne recupérez pas le gain de contexte ciblé sur chaque domaine fonctionnel.
 
-**EN —** *Project Brain* generates structured, LLM-ready project context from your codebase. Use it with any IDE: scan the repo, install a small rule file, then let the model fill in business context from a prompt.
+Après chaque `brain scan` (ou lorsque le rapport affiche des topics `new` / `stale`) :
 
-**[Français](#français)** · **[English](#english)**
+1. **Copier** le contenu de `.project/brain-topics-prompt.md` vers votre LLM (ou les prompts individuels dans `brain-topics/`), puis faire enrichir chaque topic.
+2. **Sauvegarder** chaque réponse dans `.project/brain-topics/[nom].md` (un fichier par topic enrichi).
 
----
+Le CLI rappelle ces étapes à la fin du scan ; détail du workflow : section [Brain Topics](#brain-topics).
 
-## Français
-
-### Sommaire (FR)
-
-- [Installation (FR)](#installation-fr)
-- [Démarrage rapide (FR)](#démarrage-rapide-fr)
-- [Commandes (FR)](#commandes-fr)
-- [Frameworks pris en charge (FR)](#frameworks-pris-en-charge-fr)
-- [Mécanismes d'économie de tokens (FR)](#mécanismes-déconomie-de-tokens-fr)
-- [Fonctionnement (FR)](#fonctionnement-fr)
-- [Exemple (FR)](#exemple-fr)
-- [Développement (FR)](#développement-fr)
-- [Licence (FR)](#licence-fr)
-
-### Installation (FR)
-
-Le paquet **n’est pas publié sur npm** pour l’instant. Installez-le **depuis le dépôt** :
+## Installation
 
 ```bash
 git clone https://github.com/Sildes/brain.git
@@ -85,118 +41,67 @@ npm install
 npm run build
 ```
 
-Utilisation **sans** installation sur le profil (commande `brain` absente du PATH) :
+Utilisation sans installation globale :
 
 ```bash
 node dist/cli.js scan
-# ou, pendant le développement
 npm run dev -- scan
 ```
 
-**Optionnel — rendre la commande `brain` disponible sur votre profil** (binaire npm global, selon votre préfixe Node, souvent sous le répertoire utilisateur) — après `npm run build`, à la racine du dépôt :
+Installation globale (optionnel) :
 
 ```bash
 npm install -g .
-```
-
-Alternative équivalente pour un lien symbolique vers votre clone (pratique pour développer) :
-
-```bash
+# ou
 npm link
 ```
 
-### Démarrage rapide (FR)
+**Prerequis :** Node.js >= 18
+
+## Commandes
+
+### `brain scan`
+
+Scanne le projet et genere les fichiers brain + topics.
 
 ```bash
-cd votre-projet
-brain scan                        # .project/brain.md + .project/brain-prompt.md
-brain install cursor              # IDE + prompt à coller dans le chat
-# Coller le prompt dans le chat (Cursor ou autre IDE configuré)
-# Le LLM met à jour .project/brain.md (contexte métier)
+brain scan                        # repertoire courant
+brain scan --dir /path/to/project # autre repertoire
+brain scan --output .context      # repertoire de sortie (defaut: .project)
+brain scan --adapter symfony      # forcer un adapter
 ```
 
-**Ce que vous obtenez**
+**Fichiers generes :**
 
-- Détection de framework (Symfony, Laravel, Next.js ou générique)
-- Modules déduits de l’arborescence
-- Routes utiles (métier vs techniques)
-- Commandes CLI extraites des fichiers de commandes
-- Conventions lues dans la configuration
-- Repères pour retrouver les bons dossiers
-- Un `brain.md` qui centralise le contexte
-
-### Mécanismes d'économie de tokens (FR)
-
-Project Brain réduit surtout ce que vous envoyez au modèle **à chaque session**, en évitant de redécouvrir tout le dépôt dans le chat.
-
-| Mécanisme | Effet |
-|-----------|--------|
-| **`brain.md` comme hub** | Contexte **structuré et court** (modules, repères, commandes utiles) à la place d’une exploration « from scratch » et de nombreux fichiers entiers. |
-| **Scan en local** | Arborescence, framework, routes/commandes listées, etc. sont produits **sans** consommation de tokens LLM. |
-| **`brain-prompt.md` limité** | Le générateur ne retient qu’un **petit ensemble de fichiers clés** et borne la taille du prompt d’analyse métier, au lieu de coller le repo au hasard. |
-| **Règle IDE + commandes CLI** | Pour les données à jour (routes, services…), on privilégie une **commande ciblée** et une sortie courte plutôt que d’empiler du code ou du vendor dans le contexte. |
-| **Tableau « Quick Find »** | Moins d’essais/erreurs et de lectures en rafale pour trouver où vit une fonctionnalité. |
-
-**À retenir :** l’économie est **récurrente** (chaque conversation). Il reste un coût ponctuel : `brain scan` après des changements majeurs, et parfois une passe avec `brain-prompt.md` quand le métier évolue — sinon le contexte peut se périmérer.
-
-### Commandes (FR)
-
-#### `brain scan`
-
-| Fichier | Rôle |
+| Fichier | Role |
 |---------|------|
-| `.project/brain.md` | Carte structurelle |
-| `.project/brain-prompt.md` | Prompt pour le LLM |
+| `.project/brain.md` | Carte structurelle du projet |
+| `.project/brain-prompt.md` | Prompt pour enrichissement LLM |
+| `.project/brain-topics/.draft/` | Topics auto-detectes (brouillons) |
+| `.project/brain-topics-prompt.md` | Prompt global pour enrichir les topics |
+
+**Frameworks supportes :**
+
+| Framework | Detection | Routes | Commandes |
+|-----------|-----------|--------|-----------|
+| Symfony | `composer.json` + `bin/console` | `debug:router` | `bin/console` |
+| Laravel | `artisan` + `composer.json` | `route:list` | `artisan` |
+| Next.js | `package.json` (`next`) | `app/` ou `pages/` | -- |
+| Generique | Arborescence | -- | -- |
+
+### `brain update`
+
+Re-scanne le projet en preservant la section Business Context.
 
 ```bash
-brain scan                        # scan le répertoire courant
-brain scan --dir /path/to/project # scan un autre répertoire
-brain scan --output .context      # défaut : .project
-brain scan --adapter symfony      # symfony | laravel | nextjs | generic
+brain update
+brain update --dir /path/to/project
+brain update --output .context
 ```
 
-#### `brain update`
+### `brain install [ide]`
 
-Re-scanne le projet et met à jour les fichiers brain, **en préservant la section Business Context** si elle existe.
-
-```bash
-brain update                      # met à jour .project/brain.md + brain-prompt.md
-brain update --output .context    # répertoire personnalisé
-```
-
-Utilisez `brain update` après des changements de structure (nouveaux modules, routes) pour rafraîchir le contexte sans perdre le travail métier ajouté par le LLM.
-
-#### Brain Topics (FR)
-
-`brain scan` détecte automatiquement des **domaines** (authentication, payments, etc.) par co-occurrence de termes dans les fichiers, routes et commandes.
-
-```
-brain scan
-# Génère :
-#   .project/brain-topics/.draft/*.md       — Brouillons auto-détectés
-#   .project/brain-topics/*.md              — Fichiers enrichis (après LLM)
-#   .project/brain-topics-prompt.md         — Prompt global
-#   .project/brain-topics/[topic]-prompt.md — Prompts individuels
-```
-
-**Workflow :**
-1. `brain scan` — détecte les topics nouveaux/périmés
-2. Copiez le prompt généré vers votre LLM
-3. Collez la réponse dans les fichiers topic
-4. Les futures sessions LLM utilisent les topics comme guides
-
-**Statuts des topics :**
-
-| Statut | Description | Prompt généré ? |
-|--------|-------------|-----------------|
-| NEW | Détecté, jamais enrichi | Oui |
-| UP_TO_DATE | Mêmes fichiers, même contenu | Non |
-| STALE | Fichiers ou contenu modifiés | Oui |
-| ORPHANED | Enrichi mais plus détecté | Avertissement |
-
-#### `brain install [ide]`
-
-Installe la configuration brain (section marquée ; le reste du fichier est préservé quand c’est possible).
+Installe la configuration brain dans votre IDE.
 
 ```bash
 brain install cursor      # .cursorrules
@@ -208,454 +113,196 @@ brain install all
 brain install             # interactif
 ```
 
-```bash
-brain install cursor --output .context
-```
+## Brain Topics
 
-Après installation : coller le prompt dans le chat. Le LLM lit `brain-prompt.md`, produit le contexte métier et l’écrit dans `brain.md` sous **Business Context**.
+`brain scan` detecte automatiquement des **domaines fonctionnels** (authentication, payments, etc.) par co-occurrence de termes dans les fichiers, routes et commandes.
 
-### Frameworks pris en charge (FR)
+**Priorité :** une fois les fichiers générés, l’étape **LLM + sauvegarde dans `brain-topics/[nom].md`** est aussi importante que le scan lui-même — voir [Etapes indispensables (Topics)](#etapes-indispensables-topics).
 
-| Framework | Détection | Routes | Commandes |
-|-----------|-----------|--------|-----------|
-| Symfony | `composer.json` + `bin/console` | `debug:router` | `bin/console` |
-| Laravel | `artisan` + `composer.json` | `php artisan route:list` | `artisan` |
-| Next.js | `package.json` (`next`) | `app/` ou `pages/` | — |
-| Générique | Arborescence | — | — |
-
-### Fonctionnement (FR)
-
-#### Workflow complet
+### Workflow
 
 ```
-┌──────────────────────────────────────────────────────────────────────────┐
-│                           PROJET UTILISATEUR                             │
-│  src/  config/  tests/  composer.json  ...                               │
-└─────────────────────────────────┬────────────────────────────────────────┘
-                                  │
-    ┌─────────────────────────────┼─────────────────────────────┐
-    │                             │                             │
-    ▼                             ▼                             ▼
-┌────────┐                 ┌────────┐                 ┌────────┐
-│  scan  │                 │ update │                 │install │
-└───┬────┘                 └───┬────┘                 └───┬────┘
-    │                          │                          │
-    │  ┌───────────────────────┘                          │
-    │  │ preserve Business Context                        │
-    ▼  ▼                                                  ▼
-┌─────────────────────────────────┐        ┌──────────────────────────────┐
-│      .project/                  │        │       IDE Rules              │
-│  ├── brain.md        Structural│        │  .cursorrules / CLAUDE.md    │
-│  └── brain-prompt.md  Key files │        │  .opencode/rules.md  ...     │
-└─────────────┬───────────────────┘        └──────────────┬───────────────┘
-              │                                           │
-              │  ┌────────────────────────────────────────┘
-              │  │ lit brain.md au démarrage
-              ▼  ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           LLM DANS L'IDE                                 │
-│                                                                          │
-│  1. Lit .project/brain.md (contexte structurel)                         │
-│  2. Lit .project/brain-prompt.md (fichiers clés)                        │
-│  3. Génère Business Context                                              │
-│  4. Écrit dans brain.md sous "## Business Context"                       │
-└─────────────────────────────────────────────────────────────────────────┘
+1. brain scan
+   -> Detecte les topics (nouveaux / a jour / perimes)
+
+2. INDISPENSABLE — Copiez .project/brain-topics-prompt.md vers votre LLM
+   -> Le LLM enrichit chaque topic (domaine métier documenté pour les sessions)
+
+3. INDISPENSABLE — Sauvegardez chaque reponse dans .project/brain-topics/[nom].md
+   -> Les sessions suivantes s’appuient sur ces guides ; sans cela, les topics restent vides
 ```
 
-#### Structure des fichiers générés
+### Statuts des topics
+
+| Statut | Description | Prompt genere ? |
+|--------|-------------|-----------------|
+| `new` | Detecte, jamais enrichi | Oui |
+| `up_to_date` | Meme fichiers, meme contenu | Non |
+| `stale` | Fichiers ou contenu modifies | Oui |
+| `orphaned` | Enrichi mais plus detecte | Non |
+
+### Exemple de sortie
+
+```
+✓ Scan complete!
+  Framework: Symfony
+  Modules: 15
+  Routes: 412
+  Commands: 39
+  Files: 362
+
+  Topics:
+     + admin                new          1421 files, 394 routes
+     + ckeditor             new            11 files, 0 routes
+     + chart                new            23 files, 1 routes
+     + invoice              new             4 files, 0 routes
+     + privacy              new             1 files, 6 routes
+     + affiliation          new             5 files, 0 routes
+
+  Prompts generated:
+    - .project/brain-topics-prompt.md
+    - .project/brain-topics/admin-prompt.md
+    - .project/brain-topics/ckeditor-prompt.md
+    ...
+
+  Next steps:
+    1. Copy .project/brain-topics-prompt.md to your LLM
+    2. Save each topic response to .project/brain-topics/[name].md
+```
+
+(Ces deux lignes du rapport correspondent aux [etapes indispensables](#etapes-indispensables-topics) décrites plus haut.)
+
+## Schema de fonctionnement
+
+```
+CODE SOURCE                    BRAIN                        LLM
++----------+                +----------+                +----------+
+| src/     |  brain scan    | brain.md |  lit           |          |
+| config/  | -------------> |          | ------------> | IDE      |
+| tests/   |                |          |               |          |
++----------+  brain update  | prompt.md| <------------ |          |
+               (preserve     |          |  ecrit         |          |
+                Business     | topics/  |  Business      +----------+
+                Context)     |          |  Context
+                             +----------+
+```
+
+### Flux complet
+
+```
++--------------------------------------------------------------------+
+|                        VOTRE PROJET                                 |
+|  src/  config/  tests/  composer.json  ...                         |
++-------------------------------+------------------------------------+
+                                |
+    +-----------+---------------+---------------+
+    |           |                               |
+    v           v                               v
++--------+  +--------+                    +---------+
+|  scan  |  | update |                    | install |
++---+----+  +---+----+                    +----+----+
+    |           |                               |
+    |           | preserve Business Context      |
+    v           v                               v
++------------------------------+    +---------------------------+
+|      .project/               |    |       IDE Rules           |
+|  brain.md        Structural  |    |  .cursorrules / CLAUDE.md |
+|  brain-prompt.md Key files   |    |  .opencode/rules.md  ...  |
+|  brain-topics/   Domaines    |    +---------------------------+
+|  brain-topics-prompt.md      |                 |
++------------------------------+                 |
+                                                 |
+                   +-----------------------------+
+                   | lit brain.md au demarrage
+                   v
++--------------------------------------------------------------------+
+|                        LLM DANS L'IDE                               |
+|                                                                     |
+|  1. Lit .project/brain.md (contexte structurel)                    |
+|  2. Lit .project/brain-prompt.md (fichiers cles)                  |
+|  3. Genere Business Context                                        |
+|  4. Ecrit dans brain.md sous "## Business Context"                 |
++--------------------------------------------------------------------+
+```
+
+### Structure des fichiers generes
 
 ```
 votre-projet/
-├── .project/
-│   ├── brain.md              ← Contexte structuré (modules, routes, commandes)
-│   │   ├── At a Glance       ← Résumé rapide
-│   │   ├── Modules           ← Liste des modules détectés
-│   │   ├── Routes            ← Routes métier (filtrées)
-│   │   ├── Navigation (CLI)  ← Commandes utiles
-│   │   ├── Quick Find        ← Tableau "où chercher quoi"
-│   │   ├── Topics            ← Domaines détectés automatiquement
-│   │   ├── Business Context  ← Section remplie par le LLM ✓
-│   │   └── Meta              ← Métadonnées
-│   │
-│   ├── brain-prompt.md       ← Fichiers clés + instructions pour le LLM
-│   │
-│   ├── brain-topics/         ← Topics (guides par domaine)
-│   │   ├── .draft/           ← Brouillons auto-générés
-│   │   ├── .meta.yaml        ← Suivi des statuts
-│   │   └── *.md              ← Topics enrichis (LLM)
-│   │
-│   └── brain-topics-prompt.md ← Prompt pour enrichir les topics
-│
-├── .cursorrules              ← Règle IDE (si install cursor)
-│   └── "Read .project/brain.md first..."
-│
-└── src/ ... (votre code)
++-- .project/
+|   +-- brain.md                  Contexte structure (modules, routes, commandes)
+|   |   +-- At a Glance           Resume rapide
+|   |   +-- Modules               Modules detectes
+|   |   +-- Routes                Routes metier (filtrees)
+|   |   +-- Navigation (CLI)      Commandes utiles
+|   |   +-- Quick Find            Tableau "ou chercher quoi"
+|   |   +-- Topics                Domaines detectes automatiquement
+|   |   +-- Business Context      Section remplie par le LLM
+|   |   +-- Meta                  Metadonnees
+|   |
+|   +-- brain-prompt.md           Fichiers cles + instructions LLM
+|   +-- brain-topics-prompt.md    Prompt pour enrichir les topics
+|   +-- brain-topics/
+|       +-- .draft/               Brouillons auto-generes
+|       +-- .meta.yaml            Suivi des statuts
+|       +-- *-prompt.md           Prompts individuels par topic
+|
++-- .cursorrules                  (si brain install cursor)
++-- src/ ... (votre code)
 ```
 
-#### Scan vs Update
+### Economie de tokens
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           brain scan                                     │
-│  - Crée .project/brain.md from scratch                                   │
-│  - Écrase tout le contenu existant                                       │
-│  - Utiliser pour: setup initial, reset complet                           │
-└─────────────────────────────────────────────────────────────────────────┘
+| Mecanisme | Effet |
+|-----------|-------|
+| **brain.md comme hub** | Contexte structure et compact au lieu d'une exploration from scratch |
+| **Scan en local** | Arborescence, framework, routes/commandes produits sans tokens LLM |
+| **brain-prompt.md borne** | Petit ensemble de fichiers cles, taille limitee |
+| **Quick Find** | Moins d'essais/erreurs pour trouver ou vit une fonctionnalite |
+| **Topics** | Domaines pre-identifies, prompts cibles par sujet |
 
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           brain update                                   │
-│  - Re-scanne le projet                                                   │
-│  - PRÉSERVE la section "## Business Context"                            │
-│  - Utiliser pour: rafraîchir après changements de structure              │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+## Outils complementaires
 
-#### Flux de données
+Project Brain structure le **contexte projet** (fichiers `.project/`). Vous pouvez le combiner avec d'autres outils orientes **sortie shell** ou **empaquetage de code** pour limiter encore la taille du contexte :
 
-```
-     CODE SOURCE                    BRAIN                      LLM
-    ┌─────────┐                  ┌─────────┐               ┌─────────┐
-    │ src/    │    scan/update   │brain.md │   read        │         │
-    │ config/ │ ───────────────► │         │ ────────────► │  IDE    │
-    │ tests/  │                  │         │               │         │
-    └─────────┘                  │prompt.md│ ◄──────────── │         │
-                                 │         │  write        │         │
-                                 │         │ Business      │         │
-                                 │         │ Context       └─────────┘
-                                 └─────────┘
-```
+| Outil | Description | Depot / site |
+|-------|-------------|--------------|
+| **RTK** (Rust Token Killer) | Proxy CLI qui filtre, groupe et tronque les sorties des commandes courantes (`git`, tests, `docker`, `grep`, etc.) avant qu'elles n'entrent dans le contexte du LLM ; prise en charge de nombreux outils d'IA (Cursor, Claude Code, Copilot, …). | [github.com/rtk-ai/rtk](https://github.com/rtk-ai/rtk) · [rtk-ai.app](https://www.rtk-ai.app) |
+| **Repomix** | Empaquete un depot en un fichier (ou une archive) texte avec arborescence et regles d'inclusion / exclusion, pratique pour un prompt ponctuel « tout le repo ». | [github.com/yamadashy/repomix](https://github.com/yamadashy/repomix) |
+| **Gitingest** | Transforme une URL de depot Git en extrait texte (fichiers + tree) utilisable comme contexte pour un LLM. | [gitingest.com](https://gitingest.com) |
 
-### Exemple (FR)
+**Astuce :** Brain pour la carte vivante du projet ; RTK pour ce qui transite par le terminal ; Repomix ou Gitingest quand vous avez besoin d'un dump complet ponctuel.
 
-`.cursorrules` après `brain install` :
-
-```
-# === BRAIN:START ===
-Read .project/brain.md first for project context.
-Use navigation commands listed there for live data.
-
-Quick commands:
-- Routes: php bin/console debug:router
-- Services: php bin/console debug:container
-- Tests: php bin/phpunit
-# === BRAIN:END ===
-```
-
-`.project/brain.md` : modules, routes métier, commandes, conventions, « où chercher quoi », métadonnées.
-
-### Développement (FR)
-
-Prérequis : **Node.js ≥ 18**.
+## Developpement
 
 ```bash
 git clone https://github.com/Sildes/brain.git
 cd brain
 npm install
 npm run build
-npm run dev -- scan
+npm run dev -- scan --dir /path/to/project
 ```
 
-### Licence (FR)
+- `npm run build` -- compile vers `dist/`
+- `npm run dev` -- execute `src/cli.ts` via `tsx`
 
-MIT — [LICENSE](LICENSE).
+### Ajouter un adapter
 
----
+Creer un fichier dans `src/adapters/` implementant l'interface `Adapter` :
 
-## English
+```typescript
+import { Adapter, AdapterMatch, BrainData } from "../types.js";
 
-### Table of contents (EN)
-
-- [Installation (EN)](#installation-en)
-- [Quick start (EN)](#quick-start-en)
-- [Commands (EN)](#commands-en)
-- [Supported frameworks (EN)](#supported-frameworks-en)
-- [LLM token savings (EN)](#llm-token-savings-en)
-- [How it works (EN)](#how-it-works-en)
-- [Example (EN)](#example-en)
-- [Development (EN)](#development-en)
-- [License (EN)](#license-en)
-
-### Installation (EN)
-
-The package is **not published on npm** yet. Install **from the repository**:
-
-```bash
-git clone https://github.com/Sildes/brain.git
-cd brain
-npm install
-npm run build
+export const monAdapter: Adapter = {
+  name: "mon-framework",
+  priority: 10,
+  async detect(dir: string): Promise<AdapterMatch> { ... },
+  async extract(dir: string): Promise<BrainData> { ... },
+};
 ```
 
-Run **without** installing to your user profile (no `brain` on `PATH`):
+Puis l'enregistrer dans `src/cli.ts`.
 
-```bash
-node dist/cli.js scan
-# or, while hacking on the tool
-npm run dev -- scan
-```
+## Licence
 
-**Optional — install the `brain` command for your user** (npm global bin, typically under your Node prefix / home directory) — after `npm run build`, from the repo root:
-
-```bash
-npm install -g .
-```
-
-Equivalent symlink workflow while you work on the clone:
-
-```bash
-npm link
-```
-
-### Quick start (EN)
-
-```bash
-cd your-project
-brain scan                        # .project/brain.md + .project/brain-prompt.md
-brain install cursor              # IDE rule + prompt to paste in chat
-# Paste the prompt in your IDE chat
-# The LLM updates .project/brain.md (business context)
-```
-
-**What you get**
-
-- Framework detection (Symfony, Laravel, Next.js, or generic)
-- Modules from the directory layout
-- Useful routes (business vs technical noise)
-- CLI commands from command files
-- Conventions from config
-- Pointers for where to look in the codebase
-- One `brain.md` as a single context hub
-
-### LLM token savings (EN)
-
-Project Brain mainly reduces what you send to the model **every session** by avoiding rediscovering the whole repo in chat.
-
-| Mechanism | Effect |
-|-----------|--------|
-| **`brain.md` as a hub** | **Structured, compact** context (modules, pointers, useful commands) instead of “from scratch” exploration and many full files. |
-| **Local scan** | Tree, framework, route/command lists, etc. are produced **without** LLM token usage. |
-| **Bounded `brain-prompt.md`** | The generator keeps only a **small set of key files** and caps the business-analysis prompt size, instead of pasting the repo blindly. |
-| **IDE rule + CLI commands** | For live data (routes, services…), prefer a **targeted command** and short output over stuffing code or vendor files into context. |
-| **“Quick Find” table** | Fewer wrong turns and fewer bulk file reads to locate features. |
-
-**Takeaway:** savings are **ongoing** (each conversation). There is still occasional cost: `brain scan` after major changes, and sometimes a `brain-prompt.md` pass when business logic shifts — otherwise context can go stale.
-
-### Commands (EN)
-
-#### `brain scan`
-
-| File | Role |
-|------|------|
-| `.project/brain.md` | Structural map |
-| `.project/brain-prompt.md` | LLM prompt |
-
-```bash
-brain scan --output .context       # default: .project
-brain scan --adapter symfony       # symfony | laravel | nextjs | generic
-brain scan --dir /path/to/project  # default: current directory
-```
-
-#### `brain update`
-
-Re-scans the project and updates brain files, **preserving the Business Context section** if it exists.
-
-```bash
-brain update                      # updates .project/brain.md + brain-prompt.md
-brain update --output .context    # custom directory
-```
-
-Use `brain update` after structural changes (new modules, routes) to refresh context without losing the business context added by the LLM.
-
-#### Brain Topics (EN)
-
-`brain scan` automatically detects **domains** (authentication, payments, etc.) via term co-occurrence in files, routes, and commands.
-
-```
-brain scan
-# Generates:
-#   .project/brain-topics/.draft/*.md       — Auto-detected drafts
-#   .project/brain-topics/*.md              — Enriched files (after LLM)
-#   .project/brain-topics-prompt.md         — Global prompt
-#   .project/brain-topics/[topic]-prompt.md — Individual prompts
-```
-
-**Workflow:**
-1. `brain scan` — detects new/stale topics
-2. Copy the generated prompt to your LLM
-3. Paste the response into topic files
-4. Future LLM sessions use topics as navigation guides
-
-**Topic statuses:**
-
-| Status | Description | Prompt Generated? |
-|--------|-------------|-------------------|
-| NEW | Detected, never enriched | Yes |
-| UP_TO_DATE | Same files, same content | No |
-| STALE | Files or content changed | Yes |
-| ORPHANED | Enriched but no longer detected | Warning only |
-
-#### `brain install [ide]`
-
-Installs Brain snippets (marked section; existing content is preserved when possible).
-
-```bash
-brain install cursor      # .cursorrules
-brain install claude      # CLAUDE.md
-brain install opencode    # .opencode/rules.md
-brain install windsurf    # .windsurfrules
-brain install zed         # .zed/rules.md
-brain install all
-brain install             # interactive
-```
-
-```bash
-brain install cursor --output .context
-```
-
-After install: paste the prompt into chat. The LLM reads `brain-prompt.md`, writes business context into `brain.md` under **Business Context**.
-
-### Supported frameworks (EN)
-
-| Framework | Detection | Routes | Commands |
-|-----------|-----------|--------|----------|
-| Symfony | `composer.json` + `bin/console` | `debug:router` | `bin/console` |
-| Laravel | `artisan` + `composer.json` | `php artisan route:list` | `artisan` |
-| Next.js | `package.json` (`next`) | `app/` or `pages/` | — |
-| Generic | Directory layout | — | — |
-
-### How it works (EN)
-
-#### Complete Workflow
-
-```
-┌──────────────────────────────────────────────────────────────────────────┐
-│                           YOUR PROJECT                                    │
-│  src/  config/  tests/  composer.json  ...                               │
-└─────────────────────────────────┬────────────────────────────────────────┘
-                                  │
-    ┌─────────────────────────────┼─────────────────────────────┐
-    │                             │                             │
-    ▼                             ▼                             ▼
-┌────────┐                 ┌────────┐                 ┌────────┐
-│  scan  │                 │ update │                 │install │
-└───┬────┘                 └───┬────┘                 └───┬────┘
-    │                          │                          │
-    │  ┌───────────────────────┘                          │
-    │  │ preserves Business Context                       │
-    ▼  ▼                                                  ▼
-┌─────────────────────────────────┐        ┌──────────────────────────────┐
-│      .project/                  │        │       IDE Rules              │
-│  ├── brain.md        Structural│        │  .cursorrules / CLAUDE.md    │
-│  └── brain-prompt.md  Key files │        │  .opencode/rules.md  ...     │
-└─────────────┬───────────────────┘        └──────────────┬───────────────┘
-              │                                           │
-              │  ┌────────────────────────────────────────┘
-              │  │ reads brain.md on startup
-              ▼  ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           LLM IN YOUR IDE                                │
-│                                                                          │
-│  1. Reads .project/brain.md (structural context)                        │
-│  2. Reads .project/brain-prompt.md (key files)                          │
-│  3. Generates Business Context                                           │
-│  4. Writes to brain.md under "## Business Context"                      │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-#### Generated File Structure
-
-```
-your-project/
-├── .project/
-│   ├── brain.md              ← Structured context (modules, routes, commands)
-│   │   ├── At a Glance       ← Quick summary
-│   │   ├── Modules           ← Detected modules
-│   │   ├── Routes            ← Business routes (filtered)
-│   │   ├── Navigation (CLI)  ← Useful commands
-│   │   ├── Quick Find        ← "where to find what" table
-│   │   ├── Topics            ← Auto-detected domains
-│   │   ├── Business Context  ← Section filled by LLM ✓
-│   │   └── Meta              ← Metadata
-│   │
-│   ├── brain-prompt.md       ← Key files + instructions for LLM
-│   │
-│   ├── brain-topics/         ← Topics (domain guides)
-│   │   ├── .draft/           ← Auto-generated drafts
-│   │   ├── .meta.yaml        ← Status tracking
-│   │   └── *.md              ← Enriched topics (LLM)
-│   │
-│   └── brain-topics-prompt.md ← Prompt for enriching topics
-├── .cursorrules              ← IDE rule (if you installed cursor)
-│   └── "Read .project/brain.md first..."
-└── src/ ... (your code)
-```
-
-#### Scan vs Update
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           brain scan                                     │
-│  - Creates .project/brain.md from scratch                                │
-│  - Overwrites all existing content                                       │
-│  - Use for: initial setup, full reset                                    │
-└─────────────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           brain update                                   │
-│  - Re-scans the project                                                  │
-│  - PRESERVES "## Business Context" section                               │
-│  - Use for: refresh after structural changes                             │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-#### Data Flow
-
-```
-     SOURCE CODE                     BRAIN                      LLM
-    ┌─────────┐                  ┌─────────┐               ┌─────────┐
-    │ src/    │    scan/update   │brain.md │   read        │         │
-    │ config/ │ ───────────────► │         │ ────────────► │  IDE    │
-    │ tests/  │                  │         │               │         │
-    └─────────┘                  │prompt.md│ ◄──────────── │         │
-                                 │         │  write        │         │
-                                 │         │ Business      │         │
-                                 │         │ Context       └─────────┘
-                                 └─────────┘
-```
-
-### Example (EN)
-
-`.cursorrules` after `brain install`:
-
-```
-# === BRAIN:START ===
-Read .project/brain.md first for project context.
-Use navigation commands listed there for live data.
-
-Quick commands:
-- Routes: php bin/console debug:router
-- Services: php bin/console debug:container
-- Tests: php bin/phpunit
-# === BRAIN:END ===
-```
-
-`.project/brain.md` typically includes modules, business routes, commands, conventions, a “where to look” table, and metadata.
-
-### Development (EN)
-
-Requires **Node.js ≥ 18**.
-
-```bash
-git clone https://github.com/Sildes/brain.git
-cd brain
-npm install
-npm run build
-npm run dev -- scan
-```
-
-- `npm run build` — compile to `dist/`
-- `npm run dev` — run `src/cli.ts` via `tsx`
-
-### License (EN)
-
-MIT — see [LICENSE](LICENSE).
+MIT
