@@ -53,17 +53,59 @@ async function getAllFiles(dir: string): Promise<string[]> {
   try {
     const { execFile } = await import("node:child_process");
     const result = await new Promise<string>((resolve, reject) => {
-      execFile("git", ["ls-files", "--cached", "--others", "--exclude-standard"], { cwd: dir, maxBuffer: 10 * 1024 * 1024 }, (err, stdout) => {
-        if (err) reject(err);
-        else resolve(stdout);
-      });
+      execFile(
+        "git",
+        ["ls-files", "--cached", "--others", "--exclude-standard"],
+        { cwd: dir, maxBuffer: 10 * 1024 * 1024 },
+        (err, stdout) => {
+          if (err) reject(err);
+          else resolve(stdout);
+        },
+      );
     });
-    const files = result
+
+    return result
       .split("\n")
       .filter((f) => f.trim().length > 0);
-    return files;
   } catch {
-    return [];
+    return fg("**/*", {
+      cwd: dir,
+      onlyFiles: true,
+      dot: false,
+      ignore: [
+        ".git/**",
+        "node_modules/**",
+        "vendor/**",
+        ".project/**",
+        "dist/**",
+        "build/**",
+        "coverage/**",
+        ".next/**",
+        ".nuxt/**",
+        ".cache/**",
+        "tmp/**",
+        "temp/**",
+        "**/*.avif",
+        "**/*.webp",
+        "**/*.png",
+        "**/*.jpg",
+        "**/*.jpeg",
+        "**/*.gif",
+        "**/*.svg",
+        "**/*.ico",
+        "**/*.woff",
+        "**/*.woff2",
+        "**/*.ttf",
+        "**/*.eot",
+        "**/*.mp3",
+        "**/*.mp4",
+        "**/*.mov",
+        "**/*.pdf",
+        "**/*.zip",
+        "**/*.gz",
+        "**/*.tar",
+      ],
+    });
   }
 }
 

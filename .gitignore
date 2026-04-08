@@ -3,3 +3,6 @@ dist/
 .project/
 openspec/
 *.tsbuildinfo
+.cursorrules
+package-lock.json
+
