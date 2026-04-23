@@ -1,0 +1,9 @@
+topics:
+  general:
+    keywords:
+    paths:
+      - composer.json
+      - config
+      - src/Command
+      - src/Controller
+    default_skill: repo-map

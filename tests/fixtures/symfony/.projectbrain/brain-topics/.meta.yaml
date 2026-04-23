@@ -1,0 +1,11 @@
+topics:
+  general:
+    draft_generated: 2026-04-23T19:16:30.714Z
+    enriched_at: null
+    enriched_files: []
+    file_hashes:
+      composer.json: b3d241c7d82122b8816f6b751ef22ce00cd911043625b899137e8d7fb66d1153
+      config/services.yaml: fa73fccdc99ea835967c7dee7efbed1f3ca87260d92931850fdd66da8cb12f1d
+      src/Command/ImportCommand.php: 51197a06c07af6e8ec3925c5236f363f56061171234115d4d1d848febc16356e
+      src/Controller/UserController.php: 7943544849c4bcceb962ebc6d0b0834c10ec56c7805a2624d0a99fe12d32b692
+    status: new
