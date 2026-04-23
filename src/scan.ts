@@ -3,10 +3,13 @@ import { formatBrainMd, formatBrainPromptMd, writeDraftTopics, writeTopicPrompts
 import { writeFile, mkdir, readdir } from "node:fs/promises";
 import path from "node:path";
 import fg from "fast-glob";
-import type { BrainData, Topic } from "./types.js";
+import type { BrainData, Topic, FreshnessEntry } from "./types.js";
 import { discoverTopics, mergeOverlappingTopics } from "./discover.js";
 import { loadMeta, detectStaleTopics, saveMeta, hashFile } from "./stale.js";
 import { TopicStatus } from "./types.js";
+import { generateTopicIndex, writeTopicIndex } from "./topic-index.js";
+import { computeFreshness, writeFreshness } from "./freshness.js";
+import { generateAgentDir } from "./agent-generator.js";
 
 export interface ScanOptions {
   dir: string;
@@ -39,6 +42,7 @@ export interface ScanResult {
   promptPath: string;
   topics: TopicSummary[];
   promptFiles: string[];
+  freshnessEntries?: FreshnessEntry[];
 }
 
 async function ensureDir(dir: string): Promise<void> {
@@ -76,7 +80,7 @@ async function getAllFiles(dir: string): Promise<string[]> {
         ".git/**",
         "node_modules/**",
         "vendor/**",
-        ".project/**",
+        ".projectbrain/**",
         "dist/**",
         "build/**",
         "coverage/**",
@@ -110,7 +114,7 @@ async function getAllFiles(dir: string): Promise<string[]> {
 }
 
 export async function scanProject(options: ScanOptions): Promise<ScanResult> {
-  const { dir, outputDir = ".project", adapter: forcedAdapter } = options;
+  const { dir, outputDir = ".projectbrain", adapter: forcedAdapter } = options;
 
   const result = await findBestAdapter(dir);
 
@@ -149,6 +153,8 @@ export async function scanProject(options: ScanOptions): Promise<ScanResult> {
 
   const topicsDir = path.join(dir, outputDir, "brain-topics");
 
+  let freshnessEntries: FreshnessEntry[] | undefined;
+
   if (topics.length > 0) {
     const meta = await loadMeta(topicsDir);
     topics = await detectStaleTopics(topics, meta, dir);
@@ -178,6 +184,26 @@ export async function scanProject(options: ScanOptions): Promise<ScanResult> {
       };
     }
     await saveMeta(topicsDir, { topics: metaTopics });
+
+    const topicIndex = generateTopicIndex(topics, data.framework);
+    const topicIndexPath = await writeTopicIndex(topicsDir, topicIndex);
+    console.log(`Generated: ${topicIndexPath}`);
+
+    const freshness = computeFreshness(topics);
+    const freshnessPath = await writeFreshness(topicsDir, freshness);
+    console.log(`Generated: ${freshnessPath}`);
+    freshnessEntries = Object.values(freshness.entries);
+
+    const topicsList = topics.map(t => `- ${t.name}`).join('\n');
+    const agentFiles = await generateAgentDir({
+      projectDir: dir,
+      framework: data.framework,
+      brainData: data,
+      topicsList,
+    });
+    for (const f of agentFiles) {
+      console.log(`Generated: ${f}`);
+    }
   }
 
   const brainMd = formatBrainMd(data, dir, undefined, topics);
@@ -222,5 +248,6 @@ export async function scanProject(options: ScanOptions): Promise<ScanResult> {
     promptPath,
     topics: topicSummaries,
     promptFiles,
+    freshnessEntries,
   };
 }

@@ -14,6 +14,11 @@ import { discoverTopics, mergeOverlappingTopics } from "./discover.js";
 import { TopicStatus } from "./types.js";
 import { execFile } from "node:child_process";
 import path from "node:path";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(readFileSync(path.join(__dirname, "../package.json"), "utf8"));
 
 // Register all adapters
 registerAdapter(symfonyAdapter);
@@ -24,13 +29,13 @@ registerAdapter(genericAdapter);
 program
   .name("brain")
   .description("Generate project context for LLMs - works with any IDE")
-  .version("0.1.0");
+  .version(pkg.version);
 
 program
   .command("scan")
   .description("Scan the project and generate brain files")
   .option("-d, --dir <path>", "Project directory", process.cwd())
-  .option("-o, --output <dir>", "Output directory", ".project")
+  .option("-o, --output <dir>", "Output directory", ".projectbrain")
   .option("-a, --adapter <name>", "Force specific adapter")
   .action(async (options) => {
     try {
@@ -48,6 +53,10 @@ program
       console.log(`  Files: ${result.fileCount}`);
 
       if (result.topics.length > 0) {
+        const freshnessMap = new Map(
+          (result.freshnessEntries || []).map(e => [e.topic, e.status]),
+        );
+
         console.log("\n  Topics:");
         const byStatus = new Map<string, typeof result.topics>();
         for (const t of result.topics) {
@@ -67,6 +76,9 @@ program
               t.status === 'stale' ? '   !' :
               '   ?';
 
+            const freshStatus = freshnessMap.get(t.name) || 'fresh';
+            const freshBadge = `[${freshStatus}]`;
+
             let detail = `${t.fileCount} files, ${t.routeCount} routes`;
             if (t.staleReason === 'files_changed' && t.staleDetails) {
               const parts: string[] = [];
@@ -77,7 +89,7 @@ program
               detail += ` (${t.staleDetails.modified.length} modified)`;
             }
 
-            console.log(`  ${icon} ${t.name.padEnd(20)} ${t.status.padEnd(12)} ${detail}`);
+            console.log(`  ${icon} ${t.name.padEnd(20)} ${freshBadge.padEnd(8)} ${detail}`);
           }
         }
       }
@@ -106,7 +118,7 @@ program
   .command("update")
   .description("Update brain files while preserving Business Context")
   .option("-d, --dir <path>", "Project directory", process.cwd())
-  .option("-o, --output <dir>", "Output directory", ".project")
+  .option("-o, --output <dir>", "Output directory", ".projectbrain")
   .option("-a, --adapter <name>", "Force specific adapter")
   .action(async (options) => {
     try {
@@ -137,14 +149,17 @@ program
   .command("install")
   .description("Install brain configuration for your IDE")
   .argument("[ide]", "Target IDE (cursor, claude, opencode, windsurf, zed, all)")
-  .option("-o, --output <dir>", "Output directory", ".project")
+  .option("-d, --dir <path>", "Project directory", process.cwd())
+  .option("-o, --output <dir>", "Output directory", ".projectbrain")
+  .option("--with-hook", "Install pre-commit hook without prompting")
   .action(async (ide, options) => {
     try {
       await installIde({
-        dir: process.cwd(),
+        dir: options.dir,
         ide: ide,
         brainPath: `${options.output}/brain.md`,
         promptPath: `${options.output}/brain-prompt.md`,
+        withHook: options.withHook,
       });
     } catch (error: any) {
       console.error("Error:", error.message);
@@ -156,7 +171,7 @@ program
   .command("enrich")
   .description("Generate enrichment instruction for processing all topic prompts")
   .option("-d, --dir <path>", "Project directory", process.cwd())
-  .option("-o, --output <dir>", "Output directory", ".project")
+  .option("-o, --output <dir>", "Output directory", ".projectbrain")
   .option("-t, --topic <name>", "Generate instruction for a specific topic (or 'all')")
   .option("-i, --install <ide>", "Install instruction as IDE rule (cursor, claude, opencode, windsurf, zed)")
   .option("--stdout", "Print instruction to stdout")
@@ -179,7 +194,7 @@ program
   .command("prompt")
   .description("Generate LLM prompt for business context or specific topic")
   .option("-d, --dir <path>", "Project directory", process.cwd())
-  .option("-o, --output <dir>", "Output directory", ".project")
+  .option("-o, --output <dir>", "Output directory", ".projectbrain")
   .option("-t, --topic <name>", "Generate prompt for a specific topic")
   .option("-a, --adapter <name>", "Force specific adapter")
   .option("--stdout", "Print prompt to stdout instead of saving")
@@ -270,6 +285,108 @@ program
     } catch (error: any) {
       console.error("Error:", error.message);
       process.exit(1);
+    }
+  });
+
+program
+  .command("skill")
+  .description("Execute a skill against the project")
+  .argument("[name]", "Skill name to execute")
+  .option("-d, --dir <path>", "Project directory", process.cwd())
+  .option("-t, --topic <name>", "Topic name for context")
+  .option("--diff <string>", "Git diff content")
+  .option("--query <string>", "Search query for route-debug")
+  .option("--json", "Output as JSON")
+  .action(async (name, options) => {
+    try {
+      const { runSkill, listSkills, createSkillContext } = await import("./skills/runner.js");
+      await import("./skills/repo-map.js");
+      await import("./skills/twig-inline-css.js");
+      await import("./skills/symfony-review.js");
+      await import("./skills/route-debug.js");
+      await import("./skills/diff-only.js");
+
+      if (!name) {
+        const skills = listSkills();
+        if (skills.length === 0) {
+          console.log("No skills registered.");
+          return;
+        }
+        console.log("Available skills:");
+        for (const s of skills) {
+          console.log(`  ${s.name} — ${s.description} (input: ${s.inputType})`);
+        }
+        return;
+      }
+
+      const ctx = await createSkillContext({
+        projectDir: options.dir,
+        diff: options.diff,
+        query: options.query,
+      });
+
+      const result = await runSkill(name, ctx);
+
+      if (options.json) {
+        console.log(JSON.stringify(result, null, 2));
+      } else {
+        console.log(`goal: ${result.goal}`);
+        console.log(`topic: ${result.topic}`);
+        console.log(`files:`);
+        for (const f of result.files) console.log(`  - ${f}`);
+        console.log(`actions:`);
+        for (const a of result.actions) console.log(`  ${result.actions.indexOf(a) + 1}. ${a}`);
+        console.log(`risks:`);
+        for (const r of result.risks) console.log(`  ! ${r}`);
+        console.log(`next: ${result.next}`);
+      }
+    } catch (error: any) {
+      console.error(`Error: ${error.message}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("hook")
+  .description("Install or manage pre-commit hook")
+  .option("-d, --dir <path>", "Project directory", process.cwd())
+  .option("--uninstall", "Remove the brain pre-commit hook")
+  .action(async (options) => {
+    try {
+      const { installHook, uninstallHook } = await import("./hook.js");
+
+      if (options.uninstall) {
+        const removed = await uninstallHook(options.dir);
+        if (removed) {
+          console.log("✓ Brain pre-commit hook removed.");
+        } else {
+          console.log("No brain pre-commit hook found.");
+        }
+        return;
+      }
+
+      await installHook(options.dir);
+      console.log("✓ Brain pre-commit hook installed.");
+      console.log("  The hook will mark dirty topics on each commit.");
+      console.log("  Remove with: brain hook --uninstall");
+    } catch (error: any) {
+      console.error(`Error: ${error.message}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("_hook-check", { hidden: true })
+  .description("Internal: run freshness pre-check (called by pre-commit hook)")
+  .option("-d, --dir <path>", "Project directory", process.cwd())
+  .action(async (options: any) => {
+    try {
+      const { runPreCheck, formatPreCheckReport } = await import("./hook.js");
+      const freshness = await runPreCheck(options.dir);
+      const report = formatPreCheckReport(freshness);
+      console.log(report);
+    } catch (error: any) {
+      console.error(`Brain check warning: ${error.message}`);
     }
   });
 

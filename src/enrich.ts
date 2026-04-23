@@ -114,7 +114,7 @@ function formatEnrichInstruction(
 }
 
 export async function enrichTopics(options: EnrichOptions): Promise<void> {
-  const { dir, outputDir = ".project", topic, ide, stdout: printStdout } = options;
+  const { dir, outputDir = ".projectbrain", topic, ide, stdout: printStdout } = options;
 
   const { findBestAdapter } = await import("./detect.js");
   const result = await findBestAdapter(dir);

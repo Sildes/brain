@@ -1,6 +1,6 @@
 {
   "name": "project-brain",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Generate project context for LLMs - works with any IDE",
   "type": "module",
   "bin": {

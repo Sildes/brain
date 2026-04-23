@@ -114,3 +114,57 @@ export interface TopicMeta {
 export interface TopicMetadata {
   topics: Record<string, TopicMeta>;
 }
+
+// === Topic Index ===
+export interface TopicIndexEntry {
+  name: string;
+  keywords: string[];
+  paths: string[];
+  defaultSkill: string;
+}
+
+export interface TopicIndex {
+  topics: Record<string, TopicIndexEntry>;
+}
+
+// === Freshness ===
+export type FreshnessStatus = 'fresh' | 'stale' | 'dirty';
+
+export interface FreshnessEntry {
+  topic: string;
+  status: FreshnessStatus;
+  lastCheck: string;
+  changedFiles?: string[];
+}
+
+export interface FreshnessData {
+  entries: Record<string, FreshnessEntry>;
+  brainMdStatus: FreshnessStatus;
+  lastUpdated: string;
+}
+
+// === Skills ===
+export interface SkillConfig {
+  name: string;
+  description: string;
+  inputType: 'topic' | 'diff' | 'error' | 'query';
+  requiredTopics: string[];
+}
+
+export interface SkillResult {
+  goal: string;
+  topic: string;
+  files: string[];
+  actions: string[];
+  risks: string[];
+  next: string;
+}
+
+// === Router ===
+export interface RouterEntry {
+  keywords: string[];
+  paths: string[];
+  topic: string;
+  skill: string;
+  score: number;
+}

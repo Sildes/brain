@@ -445,7 +445,7 @@ export async function formatTopicPromptMd(
   lines.push("For each topic below:");
   lines.push("1. READ the listed files to understand the domain");
   lines.push("2. VALIDATE — remove irrelevant files, add missing ones (check imports, deps)");
-  lines.push("3. WRITE enriched file to `.project/brain-topics/[name].md` using the format below");
+  lines.push("3. WRITE enriched file to `.projectbrain/brain-topics/[name].md` using the format below");
   lines.push("");
 
   lines.push(`## Topics (${staleNew.length})`);
@@ -455,7 +455,7 @@ export async function formatTopicPromptMd(
     const topic = staleNew[i];
     lines.push(`### ${i + 1}/${staleNew.length}: ${topic.name}`);
     lines.push(`keywords: ${topic.keywords.join(", ")}`);
-    lines.push(`output: .project/brain-topics/${topic.name}.md`);
+    lines.push(`output: .projectbrain/brain-topics/${topic.name}.md`);
     lines.push("");
 
     if (topic.routes.length > 0) {
@@ -518,8 +518,8 @@ export async function formatTopicPromptMd(
   lines.push("## Cleanup");
   lines.push("");
   lines.push("After writing all enriched topic files:");
-  lines.push("1. DELETE `.project/brain-topics/*-prompt.md` files — they are single-use prompts, not needed after enrichment");
-  lines.push("2. DELETE `.project/brain-topics/.draft/` directory — drafts are replaced by enriched files");
+  lines.push("1. DELETE `.projectbrain/brain-topics/*-prompt.md` files — they are single-use prompts, not needed after enrichment");
+  lines.push("2. DELETE `.projectbrain/brain-topics/.draft/` directory — drafts are replaced by enriched files");
   lines.push("3. DELETE any enriched topic file that is empty, redundant, or too vague to be useful — bad topics pollute context more than no topics");
 
   return lines.join("\n");
@@ -667,7 +667,7 @@ export function formatTopicsSection(topics: Topic[]): string {
   }
 
   lines.push("");
-  lines.push("See `.project/brain-topics/` for topic details.");
+  lines.push("See `.projectbrain/brain-topics/` for topic details.");
   lines.push("");
 
   return lines.join("\n");
