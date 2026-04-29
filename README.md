@@ -51,7 +51,7 @@ brain.md  topics   prompts  .agent/      LLM enrichit        Config IDE
 **Étape 2 - ENRICH** (via votre LLM)
 - Le prompt global est déjà généré par le scan (`brain-topics-prompt.md`)
 - Copiez-le dans votre chat LLM
-- Le LLM répond avec des descriptions enrichies
+- Le LLM met à jour les topics avec des descriptions enrichies
 - Sauvegardez les réponses dans `.projectbrain/brain-topics/[name].md`
 
 **Étape 3 - INSTALL** (`brain install cursor`)
@@ -199,6 +199,7 @@ Exécute un skill spécifique.
 - `symfony-review` : Vérification Symfony
 - `twig-inline-css` : Extraction CSS inline
 - `route-debug` : Diagnostic de routes
+- `architecture` : Prompt pour schéma d'architecture
 
 **Options :**
 - `--topic nom` : Topic cible
@@ -240,7 +241,7 @@ Brain détecte automatiquement le framework et utilise l'adaptateur approprié. 
 
 ## Skills
 
-Cinq skills TypeScript pour automatiser les analyses courantes.
+Six skills TypeScript pour automatiser les analyses courantes.
 
 | Skill | Rôle |
 |-------|------|
@@ -249,12 +250,15 @@ Cinq skills TypeScript pour automatiser les analyses courantes.
 | `symfony-review` | Vérification des conventions Symfony |
 | `twig-inline-css` | Extraction CSS inline des templates Twig |
 | `route-debug` | Recherche et diagnostic de routes |
+| `architecture` | Prompt LLM pour schéma d'architecture (Mermaid + ASCII) |
 
 **Utilisation :**
 ```bash
 brain skill repo-map                 # Aperçu structurel
 brain skill diff-only --diff "..."   # Analyse de diff
 brain skill route-debug --query "login"  # Recherche route
+brain skill architecture             # Prompt global → .projectbrain/architecture-prompt.md
+brain skill architecture --query auth    # Prompt pour un topic spécifique
 ```
 
 **Sortie JSON :**
@@ -270,6 +274,8 @@ votre-projet/
 │   ├── brain.md                  Carte structurelle du projet
 │   ├── brain-prompt.md           Fichiers clés + instructions LLM
 │   ├── brain-enrich.md           Instruction d'enrichissement globale
+│   ├── architecture-prompt.md   Prompt pour schéma d'architecture (généré par le skill)
+│   ├── architecture.md           Schéma d'architecture (réponse du LLM)
 │   └── brain-topics/
 │       ├── .draft/               Brouillons auto-générés
 │       ├── .meta.yaml            Statuts des topics (enrichi/stale)
@@ -289,10 +295,12 @@ votre-projet/
 ```
 
 **Flux des fichiers :**
-1. `brain.md` → Utilisé par `repo-map` skill
+1. `brain.md` → Utilisé par `repo-map` et `architecture` skills
 2. `brain-topics/*.md` → Injectés dans `system-base.md`
 3. `.agent/prompts/` → Chargés automatiquement par l'IDE
 4. `freshness.yaml` → Mis à jour par le hook pre-commit
+5. `architecture-prompt.md` → Généré par `brain skill architecture`, coller dans le LLM
+6. `architecture.md` → Réponse du LLM, schéma final
 
 ## Hook pre-commit
 
@@ -369,7 +377,7 @@ src/
 ├── hook.ts             Hook pre-commit
 ├── types.ts            Types TypeScript
 ├── adapters/           Frameworks (symfony, laravel, nextjs, generic)
-└── skills/             Skills TypeScript (5 skills)
+└── skills/             Skills TypeScript (6 skills)
 ```
 
 ## Licence

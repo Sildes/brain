@@ -171,6 +171,8 @@ export interface SkillResult {
   actions: string[];
   risks: string[];
   next: string;
+  content?: string;
+  outputFile?: string;
 }
 
 // === Router ===

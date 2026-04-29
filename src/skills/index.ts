@@ -4,3 +4,4 @@ export { twigInlineCssSkill } from "./twig-inline-css.js";
 export { symfonyReviewSkill } from "./symfony-review.js";
 export { routeDebugSkill } from "./route-debug.js";
 export { diffOnlySkill } from "./diff-only.js";
+export { architectureSkill } from "./architecture.js";

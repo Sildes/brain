@@ -304,6 +304,7 @@ program
       await import("./skills/symfony-review.js");
       await import("./skills/route-debug.js");
       await import("./skills/diff-only.js");
+      await import("./skills/architecture.js");
 
       if (!name) {
         const skills = listSkills();
@@ -329,6 +330,13 @@ program
       if (options.json) {
         console.log(JSON.stringify(result, null, 2));
       } else {
+        if (result.content && result.outputFile) {
+          const { writeFile, mkdir } = await import("node:fs/promises");
+          const outputFullPath = path.join(options.dir, result.outputFile);
+          await mkdir(path.dirname(outputFullPath), { recursive: true });
+          await writeFile(outputFullPath, result.content, "utf8");
+          console.log(`Written: ${result.outputFile}`);
+        }
         console.log(`goal: ${result.goal}`);
         console.log(`topic: ${result.topic}`);
         console.log(`files:`);
