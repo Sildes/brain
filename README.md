@@ -30,37 +30,31 @@ Génère un contexte structuré pour les LLMs à partir de votre code. Un scan l
 ## Pipeline complet
 
 ```
-+----------+       +----------+       +-----------+       +----------+
-|          |       |          |       |           |       |          |
-|   SCAN   |  -->  |  PROMPT  |  -->  |  ENRICH   |  -->  | INSTALL  |
-|          |       |          |       |           |       |          |
-+----------+       +----------+       +-----------+       +----------+
-     |                  |                  |                   |
-     v                  v                  v                   v
-Détection          Prompts pour       LLM enrichit      Config IDE
-framework          chaque topic       les topics        + .agent/
-+ topics                              avec contexte
-                                     métier
++------------------------------------------+       +-----------+       +----------+
+|                                          |       |           |       |          |
+|              brain scan                  |  -->  |  ENRICH   |  -->  | INSTALL  |
+|                                          |       |           |       |          |
++------------------------------------------+       +-----------+       +----------+
+  |        |         |         |                |                   |
+  v        v         v         v                v                   v
+brain.md  topics   prompts  .agent/      LLM enrichit        Config IDE
+          drafts   (auto)              les topics avec     + .agent/
+                                        contexte métier
 ```
 
 **Étape 1 - SCAN** (`brain scan`)
 - Détecte le framework (Symfony, Laravel, Next.js, générique)
 - Extrait les modules, routes et commandes
 - Découvre les topics (clusters de code liés)
-- Génère `.projectbrain/brain.md`, `brain-topics/`, `.agent/`
+- Génère `.projectbrain/brain.md`, les drafts, les prompts d'enrichissement, `.agent/`
 
-**Étape 2 - PROMPT** (`brain prompt --topic all`)
-- Génère des prompts d'enrichissement pour chaque topic détecté
-- Vous collez ces prompts dans votre chat LLM
+**Étape 2 - ENRICH** (via votre LLM)
+- Les prompts sont déjà générés par le scan (`*-prompt.md`)
+- Collez-les dans votre chat LLM
 - Le LLM répond avec des descriptions enrichies
-- Sauvegardées dans `.projectbrain/brain-topics/[name].md`
+- Sauvegardez les réponses dans `.projectbrain/brain-topics/[name].md`
 
-**Étape 3 - ENRICH** (via votre LLM)
-- LLM ajoute le contexte métier à chaque topic
-- Explique le pourquoi, les règles métier, les contraintes
-- Les topics deviennent compréhensibles par l'assistant
-
-**Étape 4 - INSTALL** (`brain install cursor`)
+**Étape 3 - INSTALL** (`brain install cursor`)
 - Génère les fichiers de config spécifiques à votre IDE
 - Cursor → `.cursorrules`
 - Claude Code → `CLAUDE.md`
@@ -68,6 +62,9 @@ framework          chaque topic       les topics        + .agent/
 - Windsurf → `.windsurfrules`
 - Zed → `.zed/rules.md`
 - Crée `.agent/` avec les prompts système
+
+> **Plus tard, si le hook marque des topics stale :** `brain prompt --topic auth`
+> régénère le prompt pour un topic spécifique.
 
 ## Hook de fraîcheur
 
@@ -95,11 +92,11 @@ Le hook pre-commit marque automatiquement les topics impactés comme obsolètes 
 npm install -g project-brain
 cd votre-projet
 
-# 1. Scanner le projet
+# 1. Scanner le projet (génère brain.md, topics, prompts, .agent/)
 brain scan
 
-# 2. Enrichir les topics détectés (collez les prompts dans votre LLM)
-brain prompt --topic all
+# 2. Enrichir (collez les prompts générés dans votre LLM, sauvegardez les réponses)
+#    Les prompts sont dans .projectbrain/brain-topics/[name]-prompt.md
 
 # 3. Configurer votre IDE
 brain install cursor      # ou: claude, opencode, windsurf, zed, all
@@ -141,19 +138,16 @@ Re-scanne le projet en préservant le Business Context enrichi.
 ```bash
 brain prompt [--topic nom|all] [--stdout]
 ```
-Génère les prompts d'enrichissement pour les topics.
+Régénère les prompts d'enrichissement pour les topics new/stale.
+
+**Quand l'utiliser :** après qu'un hook pre-commit ait marqué des topics comme stale, ou pour cibler un topic spécifique.
+
+> Les prompts sont déjà générés par `brain scan`. Cette commande sert à les régénérer.
 
 **Options :**
 - `--topic nom` : Prompt pour un topic spécifique
-- `--topic all` : Prompts pour tous les topics (défaut)
+- `--topic all` : Prompts pour tous les topics new/stale
 - `--stdout` : Affiche sans sauvegarder
-
-**Workflow :**
-```bash
-brain prompt --topic auth
-# Copiez le prompt dans votre chat LLM
-# Collez la réponse dans .projectbrain/brain-topics/auth.md
-```
 
 ### brain enrich
 ```bash
