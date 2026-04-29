@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.project/
+openspec/
+*.tsbuildinfo
+.cursorrules
+package-lock.json
+.sisyphus/
+.projectbrain/
+.agent/
+CLAUDE.md
+bun.lock
+.gitignore
+.cursorrules
