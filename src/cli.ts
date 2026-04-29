@@ -99,9 +99,8 @@ program
         for (const f of result.promptFiles) {
           console.log(`    - ${f}`);
         }
-        console.log("\n  Next steps:");
-        console.log("    1. Copy brain-topics-prompt.md to your LLM");
-        console.log("    2. Save each topic response to brain-topics/[name].md");
+        console.log("\n  Next step:");
+        console.log("    Copy brain-topics-prompt.md to your LLM");
       } else if (result.topics.length > 0) {
         console.log("\n  All topics up to date.");
       }

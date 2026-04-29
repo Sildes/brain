@@ -49,8 +49,8 @@ brain.md  topics   prompts  .agent/      LLM enrichit        Config IDE
 - Génère `.projectbrain/brain.md`, les drafts, les prompts d'enrichissement, `.agent/`
 
 **Étape 2 - ENRICH** (via votre LLM)
-- Les prompts sont déjà générés par le scan (`*-prompt.md`)
-- Collez-les dans votre chat LLM
+- Le prompt global est déjà généré par le scan (`brain-topics-prompt.md`)
+- Copiez-le dans votre chat LLM
 - Le LLM répond avec des descriptions enrichies
 - Sauvegardez les réponses dans `.projectbrain/brain-topics/[name].md`
 
