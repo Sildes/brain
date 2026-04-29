@@ -1,15 +1,17 @@
 import { findBestAdapter } from "./detect.js";
 import { formatBrainMd, formatBrainPromptMd, writeDraftTopics, writeTopicPrompts } from "./output.js";
-import { writeFile, mkdir, readdir } from "node:fs/promises";
+import { writeFile, mkdir, readdir, readFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import fg from "fast-glob";
-import type { BrainData, Topic, FreshnessEntry } from "./types.js";
+import type { BrainData, Topic, FreshnessEntry, TopicIndex } from "./types.js";
 import { discoverTopics, mergeOverlappingTopics } from "./discover.js";
 import { loadMeta, detectStaleTopics, saveMeta, hashFile } from "./stale.js";
 import { TopicStatus } from "./types.js";
-import { generateTopicIndex, writeTopicIndex } from "./topic-index.js";
+import { generateTopicIndex, writeTopicIndex, readTopicIndex } from "./topic-index.js";
 import { computeFreshness, writeFreshness } from "./freshness.js";
 import { generateAgentDir } from "./agent-generator.js";
+import { computeTopicDependencies, mergeDependencies } from "./dependency-graph.js";
+import { computeTopicQuality } from "./quality.js";
 
 export interface ScanOptions {
   dir: string;
@@ -50,6 +52,37 @@ async function ensureDir(dir: string): Promise<void> {
     await mkdir(dir, { recursive: true });
   } catch (error: any) {
     if (error.code !== "EEXIST") throw error;
+  }
+}
+
+async function cleanupStalePrompts(outputDir: string, topicsDir: string): Promise<void> {
+  const filesToClean: string[] = [];
+
+  try {
+    const entries = await readdir(topicsDir);
+    for (const entry of entries) {
+      if (entry.endsWith('-prompt.md')) {
+        filesToClean.push(path.join(topicsDir, entry));
+      }
+    }
+  } catch {}
+
+  const globalPrompt = path.join(outputDir, 'brain-topics-prompt.md');
+  try {
+    await readFile(globalPrompt);
+    filesToClean.push(globalPrompt);
+  } catch {}
+
+  const enrichInstruction = path.join(outputDir, 'brain-enrich.md');
+  try {
+    await readFile(enrichInstruction);
+    filesToClean.push(enrichInstruction);
+  } catch {}
+
+  for (const f of filesToClean) {
+    try {
+      await unlink(f);
+    } catch {}
   }
 }
 
@@ -151,6 +184,11 @@ export async function scanProject(options: ScanOptions): Promise<ScanResult> {
     console.log("Topic discovery skipped:", e.message);
   }
 
+  let depMap: Map<string, { dependsOn: string[]; relatedTo: string[] }> = new Map();
+  if (topics.length > 0) {
+    depMap = computeTopicDependencies(topics);
+  }
+
   const topicsDir = path.join(dir, outputDir, "brain-topics");
 
   let freshnessEntries: FreshnessEntry[] | undefined;
@@ -186,6 +224,51 @@ export async function scanProject(options: ScanOptions): Promise<ScanResult> {
     await saveMeta(topicsDir, { topics: metaTopics });
 
     const topicIndex = generateTopicIndex(topics, data.framework);
+
+    // Step 4a: Static keyword-based relatedTo
+    for (const topic of topics) {
+      const deps = depMap.get(topic.name);
+      if (deps) {
+        topicIndex.topics[topic.name].relatedTo = deps.relatedTo;
+        topicIndex.topics[topic.name].dependsOn = [];
+      }
+    }
+
+    // Step 4b: Post-enrichment processing (LLM deps + quality)
+    for (const topic of topics) {
+      if (topic.status === TopicStatus.UpToDate || topic.status === TopicStatus.Stale) {
+        const enrichedPath = path.join(topicsDir, `${topic.name}.md`);
+        try {
+          const enrichedContent = await readFile(enrichedPath, "utf8");
+          if (enrichedContent.trim().length > 0) {
+            // Parse LLM-inferred dependencies from enriched topic
+            const { parseDependenciesFromTopic } = await import("./dependency-graph.js");
+            const llmDeps = parseDependenciesFromTopic(enrichedContent, new Set(topics.map(t => t.name)));
+            const merged = mergeDependencies(depMap, new Map([[topic.name, llmDeps]]), new Set(topics.map(t => t.name)));
+            const mergedDeps = merged.get(topic.name);
+            if (mergedDeps) {
+              topicIndex.topics[topic.name].dependsOn = mergedDeps.dependsOn;
+              topicIndex.topics[topic.name].relatedTo = [...new Set([
+                ...(topicIndex.topics[topic.name].relatedTo || []),
+                ...mergedDeps.relatedTo,
+              ])];
+            }
+
+            // Compute quality score
+            const quality = computeTopicQuality(topic, enrichedContent);
+            if (quality) {
+              metaTopics[topic.name].quality = quality;
+            }
+          }
+        } catch {
+          // Enriched file doesn't exist or can't be read — skip post-enrichment
+        }
+      }
+    }
+
+    // Re-write meta with quality scores
+    await saveMeta(topicsDir, { topics: metaTopics });
+
     const topicIndexPath = await writeTopicIndex(topicsDir, topicIndex);
     console.log(`Generated: ${topicIndexPath}`);
 
@@ -206,7 +289,7 @@ export async function scanProject(options: ScanOptions): Promise<ScanResult> {
     }
   }
 
-  const brainMd = formatBrainMd(data, dir, undefined, topics);
+  const brainMd = formatBrainMd(data, dir, undefined, topics, depMap);
   const brainPromptMd = await formatBrainPromptMd(data, dir);
 
   const outputPath = path.join(dir, outputDir);
@@ -224,6 +307,7 @@ export async function scanProject(options: ScanOptions): Promise<ScanResult> {
 
   let promptFiles: string[] = [];
   if (topics.length > 0) {
+    await cleanupStalePrompts(outputPath, topicsDir);
     promptFiles = await writeTopicPrompts(outputPath, topicsDir, topics, dir, data);
   }
 
