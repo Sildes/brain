@@ -96,7 +96,7 @@ cd votre-projet
 brain scan
 
 # 2. Enrichir (collez les prompts générés dans votre LLM, sauvegardez les réponses)
-#    Les prompts sont dans .projectbrain/brain-topics/[name]-prompt.md
+Copiez le contenu de "brain-topics-prompt.md" dans votre LLM
 
 # 3. Configurer votre IDE
 brain install cursor      # ou: claude, opencode, windsurf, zed, all
