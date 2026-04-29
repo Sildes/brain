@@ -15,7 +15,13 @@ function formatDate(date: Date): string {
   return date.toISOString().split(".")[0] + "Z";
 }
 
-export function formatBrainMd(data: BrainData, dir: string, businessContext?: string, topics?: Topic[]): string {
+export function formatBrainMd(
+  data: BrainData,
+  dir: string,
+  businessContext?: string,
+  topics?: Topic[],
+  depMap?: Map<string, { dependsOn: string[]; relatedTo: string[] }>,
+): string {
   const lines: string[] = [];
 
   // Header
@@ -149,7 +155,7 @@ export function formatBrainMd(data: BrainData, dir: string, businessContext?: st
 
   // Topics
   if (topics && topics.length > 0) {
-    const topicsSection = formatTopicsSection(topics);
+    const topicsSection = formatTopicsSection(topics, depMap);
     if (topicsSection) {
       lines.push(topicsSection);
     }
@@ -488,6 +494,18 @@ export async function formatTopicPromptMd(
     lines.push("");
   }
 
+  const allTopicNames = staleNew.map(t => t.name);
+  lines.push("## Available topics (for dependencies)");
+  lines.push(allTopicNames.join(", "));
+  lines.push("");
+
+  lines.push("## Dependencies — REQUIRED");
+  lines.push("- List other topics whose context is needed to understand this topic");
+  lines.push("- depends_on = cannot understand this topic without those topics");
+  lines.push("- related_to = often used together, complementary knowledge");
+  lines.push("- Use topic names exactly as they appear in the topic list above");
+  lines.push("");
+
   lines.push("## Output Format");
   lines.push("");
   lines.push("```");
@@ -512,6 +530,10 @@ export async function formatTopicPromptMd(
   lines.push("");
   lines.push("## gotchas");
   lines.push("- X does Y instead of Z — path/file.php");
+  lines.push("");
+  lines.push("## dependencies");
+  lines.push("depends_on: topic-a, topic-b");
+  lines.push("related_to: topic-c, topic-d");
   lines.push("```");
   lines.push("");
 
@@ -529,6 +551,7 @@ export async function formatSingleTopicPromptMd(
   topic: Topic,
   projectDir: string,
   data: BrainData,
+  allTopicNames: string[] = [],
 ): Promise<string> {
   const lines: string[] = [];
 
@@ -575,6 +598,10 @@ export async function formatSingleTopicPromptMd(
     lines.push("");
   }
 
+  lines.push("## Available topics (for dependencies)");
+  lines.push(allTopicNames.filter(n => n !== topic.name).join(", "));
+  lines.push("");
+
   lines.push("## Task");
   lines.push("");
   lines.push("Produce a TOPIC FILE optimized for LLM consumption (not human readable).");
@@ -614,6 +641,10 @@ export async function formatSingleTopicPromptMd(
   lines.push("## gotchas");
   lines.push("- ClassName::method does X instead of Y — path/to/file.php");
   lines.push("- edge case: Z fails when W — path/to/file.php");
+  lines.push("");
+  lines.push("## dependencies");
+  lines.push("depends_on: topic-a, topic-b");
+  lines.push("related_to: topic-c, topic-d");
   lines.push("```");
 
   return lines.join("\n");
@@ -640,8 +671,9 @@ export async function writeTopicPrompts(
   written.push(globalPromptPath);
 
   await ensureDir(topicsDir);
+  const allTopicNames = staleNew.map(t => t.name);
   for (const topic of staleNew) {
-    const singlePrompt = await formatSingleTopicPromptMd(topic, projectDir, data);
+    const singlePrompt = await formatSingleTopicPromptMd(topic, projectDir, data, allTopicNames);
     const promptPath = path.join(topicsDir, `${topic.name}-prompt.md`);
     await writeFile(promptPath, singlePrompt, "utf8");
     written.push(promptPath);
@@ -650,7 +682,10 @@ export async function writeTopicPrompts(
   return written;
 }
 
-export function formatTopicsSection(topics: Topic[]): string {
+export function formatTopicsSection(
+  topics: Topic[],
+  depMap?: Map<string, { dependsOn: string[]; relatedTo: string[] }>,
+): string {
   if (topics.length === 0) return "";
 
   const lines: string[] = [];
@@ -663,7 +698,10 @@ export function formatTopicsSection(topics: Topic[]): string {
       topic.status === TopicStatus.New ? "+" :
       topic.status === TopicStatus.Stale ? "!" :
       "?";
-    lines.push(`- **${topic.name}** [${statusIcon}] — ${topic.files.length} files, ${topic.routes.length} routes`);
+    const deps = depMap?.get(topic.name);
+    const depStr = deps?.dependsOn.length ? ` | needs: ${deps.dependsOn.join(', ')}` : '';
+    const relStr = deps?.relatedTo.length ? ` | related: ${deps.relatedTo.join(', ')}` : '';
+    lines.push(`- **${topic.name}** [${statusIcon}] — ${topic.files.length} files, ${topic.routes.length} routes${depStr}${relStr}`);
   }
 
   lines.push("");

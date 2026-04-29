@@ -74,6 +74,27 @@ function parseSimpleYaml(content: string): Record<string, any> {
       }
       ((result[currentTopic] as any)[currentField] as string[]).push(val);
     }
+
+    if (currentField === "quality" && line.startsWith("      ")) {
+      const indent6 = line.substring(6);
+      if (indent6.includes(":")) {
+        const [key, ...rest] = indent6.split(":");
+        const val = rest.join(":").trim();
+        if (!(result[currentTopic] as any)[currentField]) {
+          (result[currentTopic] as any)[currentField] = {};
+        }
+        const qualityObj = (result[currentTopic] as any)[currentField];
+        if (val === "true") {
+          qualityObj[key.trim()] = true;
+        } else if (val === "false") {
+          qualityObj[key.trim()] = false;
+        } else if (/^\d+\.?\d*$/.test(val)) {
+          qualityObj[key.trim()] = parseFloat(val);
+        } else {
+          qualityObj[key.trim()] = val;
+        }
+      }
+    }
   }
 
   return result;
@@ -148,6 +169,16 @@ function serializeMetaYaml(meta: TopicMetadata): string {
         }
       }
     }
+    if (topicMeta.quality) {
+      lines.push(`    quality:`);
+      lines.push(`      lines: ${topicMeta.quality.lines}`);
+      lines.push(`      flows: ${topicMeta.quality.flows}`);
+      lines.push(`      gotchas: ${topicMeta.quality.gotchas}`);
+      lines.push(`      routes: ${topicMeta.quality.routes}`);
+      lines.push(`      commands: ${topicMeta.quality.commands}`);
+      lines.push(`      fileCoverage: ${topicMeta.quality.fileCoverage}`);
+      lines.push(`      score: ${topicMeta.quality.score}`);
+    }
   }
   return lines.join("\n") + "\n";
 }
@@ -168,6 +199,15 @@ export async function loadMeta(topicsDir: string): Promise<TopicMetadata | null>
         status: r.status || TopicStatus.New,
         status_reason: r.status_reason,
         status_details: r.status_details,
+        quality: r.quality && typeof r.quality === "object" ? {
+          lines: typeof r.quality.lines === "number" ? r.quality.lines : 0,
+          flows: typeof r.quality.flows === "number" ? r.quality.flows : 0,
+          gotchas: typeof r.quality.gotchas === "number" ? r.quality.gotchas : 0,
+          routes: typeof r.quality.routes === "number" ? r.quality.routes : 0,
+          commands: typeof r.quality.commands === "number" ? r.quality.commands : 0,
+          fileCoverage: typeof r.quality.fileCoverage === "number" ? r.quality.fileCoverage : 0,
+          score: typeof r.quality.score === "number" ? r.quality.score : 0,
+        } : undefined,
       };
     }
     return { topics };

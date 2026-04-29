@@ -97,6 +97,16 @@ export interface Topic {
   };
 }
 
+export interface TopicQuality {
+  lines: number;
+  flows: number;
+  gotchas: number;
+  routes: number;
+  commands: number;
+  fileCoverage: number;
+  score: number;
+}
+
 export interface TopicMeta {
   draft_generated: string;
   enriched_at: string | null;
@@ -109,6 +119,7 @@ export interface TopicMeta {
     removed?: string[];
     modified?: string[];
   };
+  quality?: TopicQuality;
 }
 
 export interface TopicMetadata {
@@ -121,6 +132,8 @@ export interface TopicIndexEntry {
   keywords: string[];
   paths: string[];
   defaultSkill: string;
+  dependsOn: string[];
+  relatedTo: string[];
 }
 
 export interface TopicIndex {

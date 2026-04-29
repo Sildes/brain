@@ -1,6 +1,10 @@
-import { describe, it, expect } from 'vitest';
-import { formatBrainMd } from '../src/output.js';
-import type { BrainData } from '../src/types.js';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { formatBrainMd, formatTopicPromptMd, formatSingleTopicPromptMd, formatTopicsSection } from '../src/output.js';
+import type { BrainData, Topic } from '../src/types.js';
+import { TopicStatus } from '../src/types.js';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 
 function makeBrainData(overrides: Partial<BrainData> = {}): BrainData {
   return {
@@ -91,5 +95,205 @@ describe('formatBrainMd', () => {
     expect(output).toContain('src/Controller/');
     expect(output).toContain('Find tests');
     expect(output).toContain('tests/');
+  });
+});
+
+describe('formatTopicPromptMd', () => {
+  let tempDir: string;
+  let testTopics: Topic[];
+  let testData: BrainData;
+
+  beforeEach(async () => {
+    tempDir = path.join(tmpdir(), `brain-test-${Date.now()}`);
+    await mkdir(tempDir, { recursive: true });
+
+    testTopics = [
+      {
+        name: 'user',
+        keywords: ['user', 'auth'],
+        files: ['src/User.ts', 'src/Auth.ts'],
+        routes: [],
+        commands: [],
+        status: TopicStatus.New,
+      },
+      {
+        name: 'payment',
+        keywords: ['payment', 'checkout'],
+        files: ['src/Payment.ts', 'src/Checkout.ts'],
+        routes: [],
+        commands: [],
+        status: TopicStatus.New,
+      },
+    ];
+
+    testData = makeBrainData({
+      fileCount: 42,
+    });
+  });
+
+  it('includes dependencies section in output format', async () => {
+    const output = await formatTopicPromptMd(testTopics, tempDir, testData);
+
+    expect(output).toContain('## dependencies');
+    expect(output).toContain('depends_on: topic-a, topic-b');
+    expect(output).toContain('related_to: topic-c, topic-d');
+  });
+
+  it('includes available topics list', async () => {
+    const output = await formatTopicPromptMd(testTopics, tempDir, testData);
+
+    expect(output).toContain('## Available topics (for dependencies)');
+    expect(output).toContain('user, payment');
+  });
+});
+
+describe('formatSingleTopicPromptMd', () => {
+  let tempDir: string;
+  let testTopic: Topic;
+  let testData: BrainData;
+
+  beforeEach(async () => {
+    tempDir = path.join(tmpdir(), `brain-test-${Date.now()}`);
+    await mkdir(tempDir, { recursive: true });
+
+    testTopic = {
+      name: 'user',
+      keywords: ['user', 'auth'],
+      files: ['src/User.ts', 'src/Auth.ts'],
+      routes: [],
+      commands: [],
+      status: TopicStatus.New,
+    };
+
+    testData = makeBrainData({
+      fileCount: 42,
+    });
+  });
+
+  it('includes dependencies section in output format', async () => {
+    const output = await formatSingleTopicPromptMd(testTopic, tempDir, testData);
+
+    expect(output).toContain('## dependencies');
+    expect(output).toContain('depends_on: topic-a, topic-b');
+    expect(output).toContain('related_to: topic-c, topic-d');
+  });
+
+  it('includes available topics list', async () => {
+    const allTopicNames = ['user', 'payment', 'checkout'];
+    const output = await formatSingleTopicPromptMd(testTopic, tempDir, testData, allTopicNames);
+
+    expect(output).toContain('## Available topics (for dependencies)');
+    expect(output).toContain('payment, checkout');
+    expect(output).not.toContain('user, payment, checkout'); // Should filter out the current topic
+  });
+});
+
+describe('formatTopicsSection', () => {
+  it('includes needs: when dependsOn present', () => {
+    const topics: Topic[] = [
+      {
+        name: 'payment',
+        keywords: ['payment'],
+        files: ['src/Payment.ts'],
+        routes: [],
+        commands: [],
+        status: TopicStatus.New,
+      },
+    ];
+
+    const depMap = new Map([
+      ['payment', { dependsOn: ['user', 'checkout'], relatedTo: [] }],
+    ]);
+
+    const output = formatTopicsSection(topics, depMap);
+
+    expect(output).toContain('needs: user, checkout');
+  });
+
+  it('includes related: when relatedTo present', () => {
+    const topics: Topic[] = [
+      {
+        name: 'user',
+        keywords: ['user'],
+        files: ['src/User.ts'],
+        routes: [],
+        commands: [],
+        status: TopicStatus.UpToDate,
+      },
+    ];
+
+    const depMap = new Map([
+      ['user', { dependsOn: [], relatedTo: ['auth', 'profile'] }],
+    ]);
+
+    const output = formatTopicsSection(topics, depMap);
+
+    expect(output).toContain('related: auth, profile');
+  });
+
+  it('works without depMap (backward compat)', () => {
+    const topics: Topic[] = [
+      {
+        name: 'user',
+        keywords: ['user'],
+        files: ['src/User.ts'],
+        routes: [],
+        commands: [],
+        status: TopicStatus.New,
+      },
+    ];
+
+    const output = formatTopicsSection(topics);
+
+    expect(output).toContain('**user**');
+    expect(output).toContain('[+]');
+    expect(output).toContain('1 files');
+    expect(output).not.toContain('needs:');
+    expect(output).not.toContain('related:');
+  });
+
+  it('omits dep info when arrays are empty', () => {
+    const topics: Topic[] = [
+      {
+        name: 'user',
+        keywords: ['user'],
+        files: ['src/User.ts'],
+        routes: [],
+        commands: [],
+        status: TopicStatus.New,
+      },
+    ];
+
+    const depMap = new Map([
+      ['user', { dependsOn: [], relatedTo: [] }],
+    ]);
+
+    const output = formatTopicsSection(topics, depMap);
+
+    expect(output).toContain('**user**');
+    expect(output).not.toContain('needs:');
+    expect(output).not.toContain('related:');
+  });
+
+  it('shows both needs and related when both present', () => {
+    const topics: Topic[] = [
+      {
+        name: 'checkout',
+        keywords: ['checkout'],
+        files: ['src/Checkout.ts'],
+        routes: [],
+        commands: [],
+        status: TopicStatus.Stale,
+      },
+    ];
+
+    const depMap = new Map([
+      ['checkout', { dependsOn: ['cart', 'payment'], relatedTo: ['user', 'order'] }],
+    ]);
+
+    const output = formatTopicsSection(topics, depMap);
+
+    expect(output).toContain('needs: cart, payment');
+    expect(output).toContain('related: user, order');
   });
 });

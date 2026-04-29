@@ -33,6 +33,8 @@ export function generateTopicIndex(topics: Topic[], framework: string): TopicInd
       keywords: topic.keywords,
       paths,
       defaultSkill,
+      dependsOn: [],
+      relatedTo: [],
     };
   }
 
@@ -52,6 +54,18 @@ export function formatTopicIndexYaml(index: TopicIndex): string {
       lines.push(`      - ${p}`);
     }
     lines.push(`    default_skill: ${entry.defaultSkill}`);
+    if (entry.dependsOn.length > 0) {
+      lines.push(`    depends_on:`);
+      for (const dep of entry.dependsOn) {
+        lines.push(`      - ${dep}`);
+      }
+    }
+    if (entry.relatedTo.length > 0) {
+      lines.push(`    related_to:`);
+      for (const rel of entry.relatedTo) {
+        lines.push(`      - ${rel}`);
+      }
+    }
   }
   return lines.join("\n") + "\n";
 }
@@ -69,7 +83,7 @@ export function parseTopicIndexYaml(content: string): TopicIndex {
     const indent2 = line.substring(2);
     if (!indent2.startsWith(" ") && indent2.includes(":")) {
       currentTopic = indent2.split(":")[0].trim();
-      result[currentTopic] = { name: currentTopic, keywords: [], paths: [], defaultSkill: "repo-map" };
+      result[currentTopic] = { name: currentTopic, keywords: [], paths: [], defaultSkill: "repo-map", dependsOn: [], relatedTo: [] };
       currentField = "";
       continue;
     }
@@ -83,6 +97,10 @@ export function parseTopicIndexYaml(content: string): TopicIndex {
       currentField = key.trim();
       if (currentField === "default_skill") {
         result[currentTopic].defaultSkill = val;
+      } else if (currentField === "depends_on") {
+        if (val === "[]") continue;
+      } else if (currentField === "related_to") {
+        if (val === "[]") continue;
       }
       continue;
     }
@@ -90,7 +108,9 @@ export function parseTopicIndexYaml(content: string): TopicIndex {
     if (line.trim().startsWith("- ") && currentField) {
       const val = line.trim().substring(2).trim();
       if (currentField === "keywords") result[currentTopic].keywords.push(val);
-      if (currentField === "paths") result[currentTopic].paths.push(val);
+      else if (currentField === "paths") result[currentTopic].paths.push(val);
+      else if (currentField === "depends_on") result[currentTopic].dependsOn.push(val);
+      else if (currentField === "related_to") result[currentTopic].relatedTo.push(val);
     }
   }
 

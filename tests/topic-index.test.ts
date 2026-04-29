@@ -83,8 +83,67 @@ describe("round-trip YAML", () => {
     expect(parsed.topics["Admin"].keywords).toEqual(["admin"]);
     expect(parsed.topics["Admin"].paths).toEqual(["src/Admin"]);
     expect(parsed.topics["Admin"].defaultSkill).toBe("symfony-review");
+    expect(parsed.topics["Admin"].dependsOn).toEqual([]);
+    expect(parsed.topics["Admin"].relatedTo).toEqual([]);
     expect(parsed.topics["API"].keywords).toEqual(["api", "rest"]);
     expect(parsed.topics["API"].paths).toEqual(["src/Api"]);
+  });
+
+  it("round-trip preserves depends_on and related_to", () => {
+    const topics = [
+      makeTopic({ name: "Auth", keywords: ["auth"], files: ["src/Auth.ts"] }),
+      makeTopic({ name: "API", keywords: ["api"], files: ["src/Api.ts"] }),
+    ];
+    const index = generateTopicIndex(topics, "generic");
+    index.topics["Auth"].dependsOn = ["API"];
+    index.topics["Auth"].relatedTo = ["API"];
+    index.topics["API"].relatedTo = ["Auth"];
+
+    const yaml = formatTopicIndexYaml(index);
+    const parsed = parseTopicIndexYaml(yaml);
+
+    expect(parsed.topics["Auth"].dependsOn).toEqual(["API"]);
+    expect(parsed.topics["Auth"].relatedTo).toEqual(["API"]);
+    expect(parsed.topics["API"].relatedTo).toEqual(["Auth"]);
+    expect(parsed.topics["API"].dependsOn).toEqual([]);
+  });
+
+  it("omits depends_on and related_to when empty in YAML output", () => {
+    const topics = [makeTopic({ name: "Solo", keywords: ["solo"], files: ["src/solo.ts"] })];
+    const index = generateTopicIndex(topics, "generic");
+    const yaml = formatTopicIndexYaml(index);
+    expect(yaml).not.toContain("depends_on");
+    expect(yaml).not.toContain("related_to");
+  });
+
+  it("parses YAML without depends_on/related_to (backward compat)", () => {
+    const yaml = `topics:
+  auth:
+    keywords:
+      - auth
+    paths:
+      - src/Auth.ts
+    default_skill: repo-map
+`;
+    const parsed = parseTopicIndexYaml(yaml);
+    expect(parsed.topics["auth"].dependsOn).toEqual([]);
+    expect(parsed.topics["auth"].relatedTo).toEqual([]);
+  });
+
+  it("parses depends_on/related_to with [] inline syntax", () => {
+    const yaml = `topics:
+  auth:
+    keywords:
+      - auth
+    paths:
+      - src
+    default_skill: repo-map
+    depends_on: []
+    related_to: []
+`;
+    const parsed = parseTopicIndexYaml(yaml);
+    expect(parsed.topics["auth"].dependsOn).toEqual([]);
+    expect(parsed.topics["auth"].relatedTo).toEqual([]);
   });
 });
 

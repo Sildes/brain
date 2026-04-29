@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type {
+  TopicQuality,
   TopicIndexEntry,
   TopicIndex,
   FreshnessStatus,
@@ -9,6 +10,7 @@ import type {
   SkillResult,
   RouterEntry,
 } from '../src/types.js';
+import { TopicStatus } from '../src/types.js';
 import type { SkillContext, SkillDefinition } from '../src/skills/types.js';
 
 describe('Type construction tests', () => {
@@ -18,11 +20,15 @@ describe('Type construction tests', () => {
       keywords: ['login', 'jwt'],
       paths: ['src/Auth.ts'],
       defaultSkill: 'explain',
+      dependsOn: ['topic-a'],
+      relatedTo: ['topic-b'],
     };
     expect(entry.name).toBe('auth');
     expect(entry.keywords).toHaveLength(2);
     expect(entry.paths).toHaveLength(1);
     expect(entry.defaultSkill).toBe('explain');
+    expect(entry.dependsOn).toEqual(['topic-a']);
+    expect(entry.relatedTo).toEqual(['topic-b']);
   });
 
   it('constructs TopicIndex', () => {
@@ -33,6 +39,8 @@ describe('Type construction tests', () => {
           keywords: ['login'],
           paths: ['src/Auth.ts'],
           defaultSkill: 'explain',
+          dependsOn: [],
+          relatedTo: [],
         },
       },
     };
@@ -151,5 +159,58 @@ describe('Type construction tests', () => {
       };
       expect(config.inputType).toBe(inputType);
     }
+  });
+
+  it('constructs TopicQuality with all fields', () => {
+    const quality: TopicQuality = {
+      lines: 50,
+      flows: 2,
+      gotchas: 1,
+      routes: 3,
+      commands: 4,
+      fileCoverage: 0.8,
+      score: 0.75,
+    };
+    expect(quality.lines).toBe(50);
+    expect(quality.flows).toBe(2);
+    expect(quality.gotchas).toBe(1);
+    expect(quality.routes).toBe(3);
+    expect(quality.commands).toBe(4);
+    expect(quality.fileCoverage).toBe(0.8);
+    expect(quality.score).toBe(0.75);
+  });
+
+  it('constructs TopicMeta with quality', () => {
+    const meta = {
+      draft_generated: '2026-04-29',
+      enriched_at: '2026-04-29T10:00:00Z',
+      enriched_files: ['src/Auth.ts'],
+      file_hashes: { 'src/Auth.ts': 'abc123' },
+      status: TopicStatus.UpToDate,
+      quality: {
+        lines: 50,
+        flows: 2,
+        gotchas: 1,
+        routes: 3,
+        commands: 4,
+        fileCoverage: 0.8,
+        score: 0.75,
+      },
+    };
+    expect(meta.status).toBe(TopicStatus.UpToDate);
+    expect(meta.quality?.score).toBe(0.75);
+    expect(meta.quality?.fileCoverage).toBe(0.8);
+  });
+
+  it('constructs TopicMeta without quality', () => {
+    const meta = {
+      draft_generated: '2026-04-29',
+      enriched_at: null,
+      enriched_files: [],
+      file_hashes: {},
+      status: TopicStatus.New,
+    };
+    expect(meta.status).toBe(TopicStatus.New);
+    expect(meta.quality).toBeUndefined();
   });
 });
