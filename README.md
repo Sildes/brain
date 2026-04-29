@@ -1,40 +1,236 @@
 # Project Brain
 
-Génère un contexte structuré pour les LLMs à partir de votre code. Un scan local produit des fichiers que votre IDE charge automatiquement.
+Génère un contexte structuré pour les LLMs à partir de votre code. Un scan local produit des fichiers que votre IDE charge automatiquement pour donner à votre assistant une compréhension parfaite de votre projet.
+
+## Architecture
+
+```
++-------------------+      +------------------+      +-------------------+
+|                   |      |                  |      |                   |
+|   Codebase        | ---> |   brain scan     | ---> |  Fichiers context |
+|                   |      |                  |      |                   |
++-------------------+      +------------------+      +-------------------+
+                                                        |
+                                                        v
+                                                +-------------------+
+                                                |                   |
+                                                |   Chargement      |
+                                                |   automatique     |
+                                                |   par IDE         |
+                                                |                   |
+                                                +-------------------+
+```
+
+**Comment ça marche :**
+1. Brain scanne votre codebase et détecte sa structure
+2. Il génère des fichiers de contexte structurés
+3. Votre IDE (Cursor, Claude Code, Opencode, Windsurf, Zed) les charge automatiquement
+4. Le LLM connait maintenant votre projet sans que vous ayez à l'expliquer
+
+## Pipeline complet
+
+```
++----------+       +----------+       +-----------+       +----------+
+|          |       |          |       |           |       |          |
+|   SCAN   |  -->  |  PROMPT  |  -->  |  ENRICH   |  -->  | INSTALL  |
+|          |       |          |       |           |       |          |
++----------+       +----------+       +-----------+       +----------+
+     |                  |                  |                   |
+     v                  v                  v                   v
+Détection          Prompts pour       LLM enrichit      Config IDE
+framework          chaque topic       les topics        + .agent/
++ topics                              avec contexte
+                                     métier
+```
+
+**Étape 1 - SCAN** (`brain scan`)
+- Détecte le framework (Symfony, Laravel, Next.js, générique)
+- Extrait les modules, routes et commandes
+- Découvre les topics (clusters de code liés)
+- Génère `.projectbrain/brain.md`, `brain-topics/`, `.agent/`
+
+**Étape 2 - PROMPT** (`brain prompt --topic all`)
+- Génère des prompts d'enrichissement pour chaque topic détecté
+- Vous collez ces prompts dans votre chat LLM
+- Le LLM répond avec des descriptions enrichies
+- Sauvegardées dans `.projectbrain/brain-topics/[name].md`
+
+**Étape 3 - ENRICH** (via votre LLM)
+- LLM ajoute le contexte métier à chaque topic
+- Explique le pourquoi, les règles métier, les contraintes
+- Les topics deviennent compréhensibles par l'assistant
+
+**Étape 4 - INSTALL** (`brain install cursor`)
+- Génère les fichiers de config spécifiques à votre IDE
+- Cursor → `.cursorrules`
+- Claude Code → `CLAUDE.md`
+- Opencode → `.opencode/rules.md`
+- Windsurf → `.windsurfrules`
+- Zed → `.zed/rules.md`
+- Crée `.agent/` avec les prompts système
+
+## Hook de fraîcheur
+
+```
++-------------------+       +-------------------+
+|                   |       |                   |
+|   Commit git      |  -->  |   Hook déclenché  |
+|                   |       |                   |
++-------------------+       +-------------------+
+                                     |
+                                     v
+                             +-------------------+
+                             |                   |
+                             |  Topics impactés  |
+                             |  marqués stal     |
+                             |                   |
+                             +-------------------+
+```
+
+Le hook pre-commit marque automatiquement les topics impactés comme obsolètes quand les fichiers changent. Vous savez exactement quand ré-enrichir le contexte.
 
 ## Démarrage rapide
 
 ```bash
-npm install -g .
+npm install -g project-brain
 cd votre-projet
 
 # 1. Scanner le projet
 brain scan
 
-# 2. Enrichir les topics détectés
+# 2. Enrichir les topics détectés (collez les prompts dans votre LLM)
 brain prompt --topic all
 
 # 3. Configurer votre IDE
-brain install cursor      # cursor, claude, opencode, windsurf, zed, all
+brain install cursor      # ou: claude, opencode, windsurf, zed, all
 ```
 
 **Prérequis :** Node.js >= 18, Git
 
 ## Commandes
 
-| Commande | Description |
-|----------|-------------|
-| `brain scan [--dir path] [--adapter nom]` | Scan le projet, génère brain.md, topics, topic-index.yaml, freshness.yaml, .agent/ |
-| `brain update [--dir path]` | Re-scan en préservant le Business Context |
-| `brain prompt [--topic nom\|all] [--stdout]` | Génère les prompts d'enrichissement |
-| `brain enrich [--topic nom] [--install ide] [--stdout]` | Instruction d'enrichissement pour traiter les topics |
-| `brain install [ide] [--with-hook] [--dir path]` | Installe la config IDE + .agent/ + optionnellement le hook |
-| `brain skill [nom] [--topic nom] [--diff texte] [--query texte] [--json]` | Exécute un skill |
-| `brain hook [--uninstall] [--dir path]` | Installe ou supprime le hook pre-commit |
+### brain scan
+```bash
+brain scan [--dir path] [--adapter nom]
+```
+Scanne le projet et génère la structure de base.
 
-IDE supportés : `cursor`, `claude`, `opencode`, `windsurf`, `zed`, `all`.
+**Options :**
+- `--dir path` : Cible un autre projet
+- `--adapter nom` : Force un adaptateur (symfony, laravel, nextjs, generic)
 
-Toutes les commandes acceptent `--dir path` pour cibler un autre projet. `--stdout` affiche sans sauvegarder.
+**Génère :**
+- `.projectbrain/brain.md` : Carte structurelle
+- `.projectbrain/brain-topics/` : Topics détectés
+- `.projectbrain/topic-index.yaml` : Index des topics
+- `.projectbrain/freshness.yaml` : État de fraîcheur
+- `.agent/` : Prompts système
+
+### brain update
+```bash
+brain update [--dir path]
+```
+Re-scanne le projet en préservant le Business Context enrichi.
+
+**Utile quand :**
+- Vous avez ajouté du code
+- Vous voulez mettre à jour la structure
+- Vous ne voulez pas perdre vos enrichissements métier
+
+### brain prompt
+```bash
+brain prompt [--topic nom|all] [--stdout]
+```
+Génère les prompts d'enrichissement pour les topics.
+
+**Options :**
+- `--topic nom` : Prompt pour un topic spécifique
+- `--topic all` : Prompts pour tous les topics (défaut)
+- `--stdout` : Affiche sans sauvegarder
+
+**Workflow :**
+```bash
+brain prompt --topic auth
+# Copiez le prompt dans votre chat LLM
+# Collez la réponse dans .projectbrain/brain-topics/auth.md
+```
+
+### brain enrich
+```bash
+brain enrich [--topic nom] [--install ide] [--stdout]
+```
+Instruction d'enrichissement globale pour traiter les topics.
+
+**Utile pour :**
+- Donner l'instruction principale au LLM
+- Combiner avec l'installation de l'IDE
+
+### brain install
+```bash
+brain install [ide] [--with-hook] [--dir path]
+```
+Installe la configuration de l'IDE.
+
+**IDE supportés :** `cursor`, `claude`, `opencode`, `windsurf`, `zed`, `all`
+
+**Options :**
+- `--with-hook` : Installe aussi le hook pre-commit
+- `--dir path` : Cible un autre projet
+
+**Exemples :**
+```bash
+brain install cursor              # Cursor uniquement
+brain install all                 # Tous les IDEs
+brain install cursor --with-hook  # Cursor + hook
+```
+
+**Fichiers générés :**
+- Cursor : `.cursorrules`
+- Claude Code : `CLAUDE.md`
+- Opencode : `.opencode/rules.md`
+- Windsurf : `.windsurfrules`
+- Zed : `.zed/rules.md`
+
+### brain skill
+```bash
+brain skill [nom] [--topic nom] [--diff texte] [--query texte] [--json]
+```
+Exécute un skill spécifique.
+
+**Sans argument :** Liste les skills disponibles
+
+**Skills disponibles :**
+- `repo-map` : Vue structurelle du repo
+- `diff-only` : Analyse ciblée d'un diff
+- `symfony-review` : Vérification Symfony
+- `twig-inline-css` : Extraction CSS inline
+- `route-debug` : Diagnostic de routes
+
+**Options :**
+- `--topic nom` : Topic cible
+- `--diff texte` : Diff git à analyser
+- `--query texte` : Requête spécifique
+- `--json` : Sortie en JSON structuré
+
+### brain hook
+```bash
+brain hook [--uninstall] [--dir path]
+```
+Gère le hook pre-commit.
+
+**Actions :**
+- `brain hook` : Installe le hook
+- `brain hook --uninstall` : Supprime le hook
+
+**Le hook fait :**
+- Détecte les fichiers modifiés
+- Identifie les topics impactés
+- Marque les topics comme stale dans `freshness.yaml`
+
+**Combinaison utile :**
+```bash
+brain install cursor --with-hook  # IDE config + hook en une commande
+```
 
 ## Frameworks supportés
 
@@ -45,9 +241,12 @@ Toutes les commandes acceptent `--dir path` pour cibler un autre projet. `--stdo
 | Next.js | `package.json` (`next`) | `app/` ou `pages/` | — |
 | Générique | Arborescence `src/` | — | — |
 
+**Détection automatique :**
+Brain détecte automatiquement le framework et utilise l'adaptateur approprié. Pas de configuration nécessaire.
+
 ## Skills
 
-Cinq skills TypeScript, exécutables via `brain skill <nom>`.
+Cinq skills TypeScript pour automatiser les analyses courantes.
 
 | Skill | Rôle |
 |-------|------|
@@ -57,22 +256,32 @@ Cinq skills TypeScript, exécutables via `brain skill <nom>`.
 | `twig-inline-css` | Extraction CSS inline des templates Twig |
 | `route-debug` | Recherche et diagnostic de routes |
 
-Sans argument, `brain skill` liste les skills disponibles. L'option `--json` retourne la sortie en JSON structuré.
+**Utilisation :**
+```bash
+brain skill repo-map                 # Aperçu structurel
+brain skill diff-only --diff "..."   # Analyse de diff
+brain skill route-debug --query "login"  # Recherche route
+```
+
+**Sortie JSON :**
+```bash
+brain skill repo-map --json  # Pour intégration CI/CD
+```
 
 ## Fichiers générés
 
 ```
 votre-projet/
 ├── .projectbrain/
-│   ├── brain.md                  Carte structurelle
+│   ├── brain.md                  Carte structurelle du projet
 │   ├── brain-prompt.md           Fichiers clés + instructions LLM
 │   ├── brain-enrich.md           Instruction d'enrichissement globale
 │   └── brain-topics/
 │       ├── .draft/               Brouillons auto-générés
-│       ├── .meta.yaml            Statuts des topics
+│       ├── .meta.yaml            Statuts des topics (enrichi/stale)
 │       ├── topic-index.yaml      Index des topics détectés
-│       ├── freshness.yaml        État de fraîcheur des topics
-│       ├── *-prompt.md           Prompts (à supprimer après enrichissement)
+│       ├── freshness.yaml        État de fraîcheur par topic
+│       ├── *-prompt.md           Prompts à supprimer après enrichissement
 │       └── [name].md             Topics enrichis par le LLM
 └── .agent/
     ├── prompts/
@@ -85,25 +294,55 @@ votre-projet/
         └── recent-context.md     Contexte récent
 ```
 
+**Flux des fichiers :**
+1. `brain.md` → Utilisé par `repo-map` skill
+2. `brain-topics/*.md` → Injectés dans `system-base.md`
+3. `.agent/prompts/` → Chargés automatiquement par l'IDE
+4. `freshness.yaml` → Mis à jour par le hook pre-commit
+
 ## Hook pre-commit
 
-Le hook marque les topics impactés comme obsolètes à chaque commit.
+Le hook maintient votre contexte à jour automatiquement.
 
+**Fonctionnement :**
+```
+Commit
+   |
+   v
+Hook détecte fichiers modifiés
+   |
+   v
+Identifie topics impactés
+   |
+   v
+Marque topics comme stale
+   |
+   v
+freshness.yaml mis à jour
+```
+
+**Commandes :**
 ```bash
 brain hook                    # Installe le hook
 brain hook --uninstall        # Supprime le hook
-brain install cursor --with-hook  # Installe IDE config + hook en une commande
+brain install cursor --with-hook  # IDE config + hook
 ```
+
+**Workflow de mise à jour :**
+1. Le commit modifie des fichiers
+2. Le hook marque les topics impactés
+3. Vous lancez `brain prompt --topic auth` pour le topic stale
+4. L'enrichissement rafraichit le contexte
 
 ## Installation
 
+### Installation globale
 ```bash
 git clone https://github.com/Sildes/brain.git
 cd brain && npm install && npm run build && npm install -g .
 ```
 
-Sans installation globale :
-
+### Sans installation globale
 ```bash
 node dist/cli.js scan
 npm run dev -- scan --dir /path/to/project
@@ -112,11 +351,32 @@ npm run dev -- scan --dir /path/to/project
 ## Développement
 
 ```bash
-npm test          # 185 tests (vitest)
-npm run build     # compile vers dist/
+npm test          # Exécute les tests (vitest)
+npm run build     # Compile TypeScript vers dist/
 ```
 
-Dépendances : `commander`, `fast-glob`. DevDeps : `typescript`, `vitest`, `tsx`, `@types/node`.
+**Dépendances :**
+- `commander` : Parsing CLI
+- `fast-glob` : Recherche fichiers
+- `typescript` : Compilation
+- `vitest` : Tests
+- `tsx` : Exécution TypeScript
+
+**Structure du code :**
+```
+src/
+├── cli.ts              Point d'entrée CLI
+├── scan.ts             Logique de scan
+├── detect.ts           Détection de framework
+├── discover.ts         Découverte des topics
+├── enrich.ts           Enrichissement
+├── install.ts          Installation IDE
+├── output.ts           Génération des fichiers
+├── hook.ts             Hook pre-commit
+├── types.ts            Types TypeScript
+├── adapters/           Frameworks (symfony, laravel, nextjs, generic)
+└── skills/             Skills TypeScript (5 skills)
+```
 
 ## Licence
 
