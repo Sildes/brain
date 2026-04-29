@@ -10,5 +10,3 @@ package-lock.json
 .agent/
 CLAUDE.md
 bun.lock
-.gitignore
-.cursorrules
